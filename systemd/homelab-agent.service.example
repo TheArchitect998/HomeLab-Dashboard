@@ -1,0 +1,15 @@
+[Unit]
+Description=HomeLab metrics agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=savpiu
+EnvironmentFile=-/etc/homelab-agent.env
+WorkingDirectory=/opt/homelab-dashboard
+ExecStart=/opt/homelab-dashboard/venv/bin/uvicorn backend.agent:app --host 0.0.0.0 --port 9100
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
