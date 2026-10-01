@@ -22,87 +22,93 @@
         margin: 0;
         background: var(--bg);
         color: var(--text);
-        font: 13px/1.45 system-ui, sans-serif;
+        font: 16px/1.45 system-ui, sans-serif;
       }
 
       header {
-        padding: 12px 18px;
+        padding: 16px 24px;
         background: #0f172a;
         border-bottom: 1px solid var(--border);
       }
 
+      header b { font-size: 1.4rem; }
+      header .muted { font-size: 0.9rem; }
+
       main {
-        padding: 12px;
+        padding: 16px;
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 14px;
       }
 
       .card {
         background: var(--panel);
         border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 10px 12px;
+        padding: 12px 14px;
       }
 
-      .card h2 { margin: 0 0 8px; font-size: 1rem; }
+      .card h2 {
+        margin: 0 0 10px;
+        font-size: 1.3rem;
+      }
 
       .grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 6px;
+        gap: 8px;
       }
 
       .box {
         background: rgba(255,255,255,0.03);
         border: 1px solid var(--border);
         border-radius: 6px;
-        padding: 8px 6px;
+        padding: 10px 8px;
         text-align: center;
       }
 
       .label {
-        font-size: 0.62rem;
+        font-size: 0.85rem;
         text-transform: uppercase;
         color: var(--muted);
       }
 
       .value {
         display: block;
-        margin-top: 4px;
+        margin-top: 6px;
         font-weight: 700;
-        font-size: 0.95rem;
+        font-size: 1.3rem;
       }
 
       .status-row {
         display: flex;
         justify-content: space-between;
-        padding: 5px 0;
-        font-size: 0.76rem;
+        padding: 8px 0;
+        font-size: 1rem;
       }
 
       .section {
         background: var(--panel-alt);
         border: 1px solid var(--border);
         border-radius: 6px;
-        padding: 7px 8px;
-        margin-top: 8px;
+        padding: 8px 10px;
+        margin-top: 10px;
       }
 
       .section-title {
-        font-size: 0.68rem;
+        font-size: 0.9rem;
         text-transform: uppercase;
         color: var(--accent);
-        margin-bottom: 4px;
+        margin-bottom: 6px;
       }
 
       .section-content {
-        max-height: 90px;
+        max-height: 120px;
         overflow-y: auto;
-        line-height: 1.45;
+        line-height: 1.5;
         white-space: pre-wrap;
         word-break: break-all;
-        font-size: 0.7rem;
+        font-size: 0.9rem;
       }
 
       .ufw-table-wrap {
@@ -112,15 +118,16 @@
       .ufw-table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 220px;
+        min-width: 240px;
+        table-layout: fixed;
       }
 
       .ufw-table th,
       .ufw-table td {
-        padding: 4px 6px;
+        padding: 6px 8px;
         border-bottom: 1px solid var(--border);
         text-align: left;
-        font-size: 0.68rem;
+        font-size: 0.9rem;
         vertical-align: top;
       }
 
@@ -129,17 +136,27 @@
         text-transform: uppercase;
       }
 
-      table {
+      .docker-table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 8px;
+        margin-top: 10px;
+        table-layout: fixed;
       }
 
-      th, td {
-        padding: 5px 4px;
+      .docker-table th,
+      .docker-table td {
+        padding: 7px 6px;
         border-bottom: 1px solid var(--border);
-        font-size: 0.68rem;
+        text-align: left;
+        font-size: 0.9rem;
+        vertical-align: top;
+        word-break: break-word;
       }
+
+      .docker-table th:nth-child(1), .docker-table td:nth-child(1) { width: 38%; }
+      .docker-table th:nth-child(2), .docker-table td:nth-child(2) { width: 16%; }
+      .docker-table th:nth-child(3), .docker-table td:nth-child(3) { width: 30%; }
+      .docker-table th:nth-child(4), .docker-table td:nth-child(4) { width: 16%; }
 
       .ok { color: var(--ok); }
       .bad { color: var(--bad); }
@@ -147,6 +164,8 @@
 
       @media (max-width: 420px) {
         .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        body { font-size: 14px; }
+        .value { font-size: 1.2rem; }
       }
     </style>
   </head>
@@ -273,7 +292,7 @@
           <div class="status-row"><span>Jails</span><span>${(fail2ban.jails || []).length}</span></div>
           ${renderJailCards(fail2ban)}
 
-          <table>
+          <table class="docker-table">
             <thead><tr><th>Container</th><th>Status</th><th>Start</th><th>Re</th></tr></thead>
             <tbody>${renderDockerRows(data.docker || [])}</tbody>
           </table>
