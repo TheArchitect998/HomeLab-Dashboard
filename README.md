@@ -1,6 +1,6 @@
 # HomeLab Dashboard
 
-A lightweight, self-hosted monitoring dashboard for your home lab. Monitor multiple devices (Raspberry Pi, mini PCs, NAS, etc.) from a single web interface. Track CPU, RAM, disk usage, temperature, firewall status, and running containers in real-time.
+A lightweight, self-hosted monitoring dashboard for your home lab. Monitor multiple devices (Raspberry Pi, mini PCs, NAS, etc.) from a single web interface. Track CPU, RAM, disk usage, temperature, and service status with an easy-to-use dashboard.
 
 **Perfect for:** Home labs, small server farms, personal infrastructure monitoring.
 
@@ -62,13 +62,13 @@ A lightweight, self-hosted monitoring dashboard for your home lab. Monitor multi
 │  │       Aggregates metrics from agents        │  │
 │  └─────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────┘
-                        ↓
-        ┌───────────────┬───────────────┐
-        ↓               ↓               ↓
-   ┌─────────┐     ┌─────────┐     ┌─────────┐
-   │ Agent   │     │ Agent   │     │ Agent   │
-   │ (Pi 2)  │     │ (NAS)   │     │ (Other) │
-   └─────────┘     └─────────┘     └─────────┘
+                         ↓
+         ┌───────────────┬───────────────┐
+         ↓               ↓               ↓
+    ┌─────────┐     ┌─────────┐     ┌─────────┐
+    │ Agent   │     │ Agent   │     │ Agent   │
+    │ (Pi 2)  │     │ (NAS)   │     │ (Other) │
+    └─────────┘     └─────────┘     └─────────┘
 ```
 
 **How it works:**
@@ -533,9 +533,9 @@ Contributions are welcome! To contribute:
 
 ## License
 
-This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for details.
 
-You are free to use, modify, and distribute this software for personal or commercial purposes, provided you include the license notice.
+You may use, modify, and distribute this software in accordance with the terms of the Apache License 2.0, including commercial use, provided that the license notice and copyright information are retained.
 
 ---
 
@@ -543,7 +543,7 @@ You are free to use, modify, and distribute this software for personal or commer
 
 ```
 HomeLab-Dashboard/
-├── LICENSE                              # MIT License
+├── LICENSE                              # Apache License 2.0
 ├── README.md                            # This file
 ├── .gitignore                           # Git ignore rules
 ├── .env.example                         # Dashboard config template
