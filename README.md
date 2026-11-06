@@ -39,6 +39,7 @@ The new overview groups host metrics, resource trends, Docker status, and firewa
 ✅ **Real-time Monitoring**
 - CPU, RAM, disk usage, and temperature
 - Multi-device support with auto-refresh (15s)
+- Switch the interface between German, English, and French; the choice is saved in the browser
 
 ✅ **Security Monitoring**
 - UFW firewall status and active rules

@@ -91,6 +91,34 @@
         white-space: nowrap;
       }
 
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .language-select {
+        min-height: 28px;
+        padding: 3px 7px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        background: var(--surface);
+        color: var(--text);
+        font-size: 10px;
+        cursor: pointer;
+      }
+
+      .language-select:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+      }
+
       .system-state, .status-pill {
         display: inline-flex;
         align-items: center;
@@ -121,9 +149,12 @@
         flex-direction: column;
         gap: 4px;
         padding: 14px 8px;
+        scrollbar-width: none;
         border-right: 1px solid #112941;
         background: rgba(8, 22, 38, 0.72);
       }
+
+      .sidebar::-webkit-scrollbar { display: none; }
 
       .nav-link {
         display: flex;
@@ -464,8 +495,11 @@
 
       @media (max-width: 420px) {
         .brand-subtitle { display: none; }
-        .topbar { padding-right: 10px; padding-left: 10px; }
-        .system-state { max-width: 118px; overflow: hidden; text-overflow: ellipsis; }
+        .topbar { gap: 8px; padding-right: 10px; padding-left: 10px; }
+        .topbar-meta { gap: 6px; font-size: 9px; }
+        .topbar-meta > span[aria-hidden="true"] { display: none; }
+        .language-select { max-width: 68px; padding-right: 3px; padding-left: 3px; }
+        .system-state { max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
         .host-row { grid-template-columns: minmax(75px, 1fr) repeat(4, minmax(30px, auto)); gap: 5px; padding-right: 7px; padding-left: 7px; }
         th, td { padding-right: 7px; padding-left: 7px; }
       }
@@ -477,52 +511,58 @@
   </head>
   <body>
     <header class="topbar">
-      <a class="brand" href="#overview" aria-label="Homelab Monitor Übersicht">
+      <a class="brand" href="#overview" aria-label="Homelab Monitor Übersicht" data-i18n-aria-label="brandAria">
         <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="m12 2 9 4.5-9 4.5-9-4.5L12 2Z" />
           <path d="m3 11 9 4.5 9-4.5M3 16l9 5 9-5M3 6.5V16m18-9.5V16M7 8.5v4m10-4v4" />
         </svg>
         <span>
           <span class="brand-title">Homelab Monitor</span>
-          <span class="brand-subtitle">Infrastructure Overview</span>
+          <span class="brand-subtitle" data-i18n="brandSubtitle">Infrastructure Overview</span>
         </span>
       </a>
       <div class="topbar-meta">
-        <span id="system-state" class="system-state"><span class="dot"></span>Lade Status</span>
+        <label class="sr-only" for="language-select" data-i18n="languageLabel">Sprache</label>
+        <select id="language-select" class="language-select" aria-label="Sprache" data-i18n-aria-label="languageLabel">
+          <option value="de">Deutsch</option>
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+        </select>
+        <span id="system-state" class="system-state"><span class="dot"></span><span data-i18n="loadingStatus">Lade Status</span></span>
         <span aria-hidden="true">|</span>
-        <span><span class="updated-label">Aktualisiert </span><time id="updated">—</time></span>
+        <span><span class="updated-label" data-i18n="updated">Aktualisiert</span> <time id="updated">—</time></span>
       </div>
     </header>
 
     <div class="layout">
-      <nav class="sidebar" aria-label="Hauptnavigation">
+      <nav class="sidebar" aria-label="Hauptnavigation" data-i18n-aria-label="mainNavigation">
         <a class="nav-link active" href="#overview">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9Z" /></svg>
-          Übersicht
+          <span data-i18n="overview">Übersicht</span>
         </a>
         <a class="nav-link" href="#hosts">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="7" rx="1" /><rect x="3" y="14" width="18" height="7" rx="1" /><path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6" /></svg>
-          Hosts
+          <span data-i18n="hosts">Hosts</span>
         </a>
         <a class="nav-link" href="#containers">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5M3 16l9 5 9-5" /></svg>
-          Container
+          <span data-i18n="containers">Container</span>
         </a>
         <a class="nav-link" href="#security">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" /><path d="m9 12 2 2 4-4" /></svg>
-          Sicherheit
+          <span data-i18n="security">Sicherheit</span>
         </a>
-        <span class="sidebar-note">Abfrage alle 15 Sekunden</span>
+        <span class="sidebar-note" data-i18n="pollInterval">Abfrage alle 15 Sekunden</span>
       </nav>
 
       <main class="content" id="overview">
         <div id="error-banner" class="error-banner" role="status" hidden></div>
         <div id="app" class="dashboard-grid" aria-live="polite">
           <section class="panel" style="grid-column: 1 / -1; padding: 18px; color: var(--muted)">
-            Dashboard wird geladen …
+            <span data-i18n="dashboardLoading">Dashboard wird geladen …</span>
           </section>
         </div>
-        <footer class="page-footer">Autor: <a href="https://github.com/TheArchitect998" target="_blank" rel="noopener noreferrer">TheArchitect998</a></footer>
+        <footer class="page-footer"><span data-i18n="author">Autor</span>: <a href="https://github.com/TheArchitect998" target="_blank" rel="noopener noreferrer">TheArchitect998</a></footer>
       </main>
     </div>
 
@@ -531,6 +571,257 @@
       const maxHistory = 36;
       const colors = { cpu: '#229cff', ram: '#12c9c3', disk: '#a45bff', temperature: '#12c9c3' };
       let loading = false;
+      let latestDashboard = null;
+      let latestSample = null;
+      let latestError = null;
+      let latestUpdatedAt = null;
+
+      const translations = {
+        de: {
+          pageTitle: 'Homelab Monitor',
+          brandAria: 'Homelab Monitor Übersicht',
+          brandSubtitle: 'Infrastrukturübersicht',
+          languageLabel: 'Sprache',
+          loadingStatus: 'Lade Status',
+          updated: 'Aktualisiert',
+          mainNavigation: 'Hauptnavigation',
+          overview: 'Übersicht',
+          hosts: 'Hosts',
+          containers: 'Container',
+          security: 'Sicherheit',
+          pollInterval: 'Abfrage alle 15 Sekunden',
+          dashboardLoading: 'Dashboard wird geladen …',
+          author: 'Autor',
+          allSystemsOnline: 'Alle Systeme online',
+          onlineHosts: '{online} von {total} Hosts online',
+          connectionError: 'Verbindung gestört',
+          cpu: 'CPU',
+          ram: 'RAM',
+          disk: 'Speicher',
+          temperature: 'Temperatur',
+          averageUsage: 'Ø Auslastung',
+          averageOccupancy: 'Ø Belegung',
+          averageAllHosts: 'Ø aller Hosts',
+          allReachableHosts: 'Über alle erreichbaren Hosts',
+          free: 'frei',
+          rootFilesystem: 'Root-Dateisystem',
+          noTemperatureData: 'Keine Temperaturdaten',
+          hostsOnline: '{count} online',
+          ufwFirewall: 'UFW-Firewall',
+          systemResources: 'Systemressourcen',
+          temperatureTrend: 'Temperaturverlauf',
+          containerServices: 'Container-Services',
+          containerCountSingular: '{count} Container',
+          containerCountPlural: '{count} Container',
+          host: 'Host',
+          status: 'Status',
+          started: 'Gestartet',
+          restarts: 'Neustarts',
+          hostResources: 'Host-Ressourcen',
+          securityStatus: 'Sicherheitsstatus',
+          noHostsConfigured: 'Keine Hosts konfiguriert',
+          noHostData: 'Keine Host-Daten verfügbar',
+          offlineHost: 'Host offline',
+          noContainers: 'Keine Container gefunden',
+          noSecurityData: 'Keine Sicherheitsdaten verfügbar',
+          hostUnreachable: 'Host nicht erreichbar',
+          noUfwOutput: 'Keine UFW-Ausgabe',
+          noDetailsAvailable: 'Keine Details verfügbar',
+          noActiveJails: 'Keine aktiven Jails',
+          online: 'Online',
+          offline: 'Offline',
+          unknown: 'Unbekannt',
+          running: 'Läuft',
+          exited: 'Beendet',
+          paused: 'Pausiert',
+          restarting: 'Wird neu gestartet',
+          created: 'Erstellt',
+          removing: 'Wird entfernt',
+          dead: 'Gestoppt (Fehler)',
+          active: 'Aktiv',
+          inactive: 'Inaktiv',
+          firewallRules: 'Firewall-Regeln anzeigen',
+          fail2banDetails: 'Fail2Ban-Details anzeigen',
+          fail2banJails: 'Fail2Ban · {count} Jails',
+          dashboardUpdateError: 'Dashboard konnte nicht aktualisiert werden: {error}',
+          apiHttpError: 'Dashboard-API antwortet mit HTTP {status}',
+          invalidData: 'Die Dashboard-API hat ein ungültiges Datenformat geliefert'
+        },
+        en: {
+          pageTitle: 'Homelab Monitor',
+          brandAria: 'Homelab Monitor overview',
+          brandSubtitle: 'Infrastructure Overview',
+          languageLabel: 'Language',
+          loadingStatus: 'Loading status',
+          updated: 'Updated',
+          mainNavigation: 'Main navigation',
+          overview: 'Overview',
+          hosts: 'Hosts',
+          containers: 'Containers',
+          security: 'Security',
+          pollInterval: 'Refresh every 15 seconds',
+          dashboardLoading: 'Loading dashboard …',
+          author: 'Author',
+          allSystemsOnline: 'All systems online',
+          onlineHosts: '{online} of {total} hosts online',
+          connectionError: 'Connection error',
+          cpu: 'CPU',
+          ram: 'RAM',
+          disk: 'Disk',
+          temperature: 'Temperature',
+          averageUsage: 'Average usage',
+          averageOccupancy: 'Average used',
+          averageAllHosts: 'Average across hosts',
+          allReachableHosts: 'Across all reachable hosts',
+          free: 'free',
+          rootFilesystem: 'Root filesystem',
+          noTemperatureData: 'No temperature data',
+          hostsOnline: '{count} online',
+          ufwFirewall: 'UFW firewall',
+          systemResources: 'System resources',
+          temperatureTrend: 'Temperature trend',
+          containerServices: 'Container services',
+          containerCountSingular: '{count} container',
+          containerCountPlural: '{count} containers',
+          host: 'Host',
+          status: 'Status',
+          started: 'Started',
+          restarts: 'Restarts',
+          hostResources: 'Host resources',
+          securityStatus: 'Security status',
+          noHostsConfigured: 'No hosts configured',
+          noHostData: 'No host data available',
+          offlineHost: 'Host offline',
+          noContainers: 'No containers found',
+          noSecurityData: 'No security data available',
+          hostUnreachable: 'Host unreachable',
+          noUfwOutput: 'No UFW output',
+          noDetailsAvailable: 'No details available',
+          noActiveJails: 'No active jails',
+          online: 'Online',
+          offline: 'Offline',
+          unknown: 'Unknown',
+          running: 'Running',
+          exited: 'Exited',
+          paused: 'Paused',
+          restarting: 'Restarting',
+          created: 'Created',
+          removing: 'Removing',
+          dead: 'Stopped (error)',
+          active: 'Active',
+          inactive: 'Inactive',
+          firewallRules: 'Show firewall rules',
+          fail2banDetails: 'Show Fail2Ban details',
+          fail2banJails: 'Fail2Ban · {count} jails',
+          dashboardUpdateError: 'Dashboard could not be updated: {error}',
+          apiHttpError: 'Dashboard API responded with HTTP {status}',
+          invalidData: 'The dashboard API returned an invalid data format'
+        },
+        fr: {
+          pageTitle: 'Moniteur Homelab',
+          brandAria: 'Vue d’ensemble du moniteur Homelab',
+          brandSubtitle: 'Vue d’ensemble de l’infrastructure',
+          languageLabel: 'Langue',
+          loadingStatus: 'Chargement du statut',
+          updated: 'Mis à jour',
+          mainNavigation: 'Navigation principale',
+          overview: 'Vue d’ensemble',
+          hosts: 'Hôtes',
+          containers: 'Conteneurs',
+          security: 'Sécurité',
+          pollInterval: 'Actualisation toutes les 15 secondes',
+          dashboardLoading: 'Chargement du tableau de bord …',
+          author: 'Auteur',
+          allSystemsOnline: 'Tous les systèmes sont en ligne',
+          onlineHosts: '{online} hôtes sur {total} en ligne',
+          connectionError: 'Erreur de connexion',
+          cpu: 'CPU',
+          ram: 'RAM',
+          disk: 'Disque',
+          temperature: 'Température',
+          averageUsage: 'Utilisation moyenne',
+          averageOccupancy: 'Occupation moyenne',
+          averageAllHosts: 'Moyenne des hôtes',
+          allReachableHosts: 'Sur tous les hôtes accessibles',
+          free: 'libres',
+          rootFilesystem: 'Système de fichiers racine',
+          noTemperatureData: 'Aucune donnée de température',
+          hostsOnline: '{count} en ligne',
+          ufwFirewall: 'Pare-feu UFW',
+          systemResources: 'Ressources système',
+          temperatureTrend: 'Évolution de la température',
+          containerServices: 'Services conteneurs',
+          containerCountSingular: '{count} conteneur',
+          containerCountPlural: '{count} conteneurs',
+          host: 'Hôte',
+          status: 'État',
+          started: 'Démarré',
+          restarts: 'Redémarrages',
+          hostResources: 'Ressources des hôtes',
+          securityStatus: 'État de la sécurité',
+          noHostsConfigured: 'Aucun hôte configuré',
+          noHostData: 'Aucune donnée d’hôte disponible',
+          offlineHost: 'Hôte hors ligne',
+          noContainers: 'Aucun conteneur trouvé',
+          noSecurityData: 'Aucune donnée de sécurité disponible',
+          hostUnreachable: 'Hôte inaccessible',
+          noUfwOutput: 'Aucune sortie UFW',
+          noDetailsAvailable: 'Aucun détail disponible',
+          noActiveJails: 'Aucun jail actif',
+          online: 'En ligne',
+          offline: 'Hors ligne',
+          unknown: 'Inconnu',
+          running: 'En cours',
+          exited: 'Arrêté',
+          paused: 'En pause',
+          restarting: 'Redémarrage en cours',
+          created: 'Créé',
+          removing: 'Suppression en cours',
+          dead: 'Arrêté (erreur)',
+          active: 'Actif',
+          inactive: 'Inactif',
+          firewallRules: 'Afficher les règles du pare-feu',
+          fail2banDetails: 'Afficher les détails Fail2Ban',
+          fail2banJails: 'Fail2Ban · {count} jails',
+          dashboardUpdateError: 'Impossible de mettre à jour le tableau de bord : {error}',
+          apiHttpError: 'L’API du tableau de bord a répondu avec HTTP {status}',
+          invalidData: 'L’API du tableau de bord a renvoyé un format de données invalide'
+        }
+      };
+
+      const languageLocales = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR' };
+      const savedLanguage = localStorage.getItem('homelab-dashboard-language');
+      let currentLanguage = Object.hasOwn(translations, savedLanguage) ? savedLanguage : 'de';
+
+      function t(key, values = {}) {
+        const message = translations[currentLanguage][key] || translations.de[key] || key;
+        return message.replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? ''));
+      }
+
+      function applyTranslations() {
+        document.documentElement.lang = currentLanguage;
+        document.title = t('pageTitle');
+        document.querySelectorAll('[data-i18n]').forEach((element) => {
+          element.textContent = t(element.dataset.i18n);
+        });
+        document.querySelectorAll('[data-i18n-aria-label]').forEach((element) => {
+          element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel));
+        });
+        document.querySelector('#language-select').value = currentLanguage;
+      }
+
+      function locale() {
+        return languageLocales[currentLanguage];
+      }
+
+      function updateTimestamp() {
+        if (latestUpdatedAt === null) return;
+        document.querySelector('#updated').textContent = new Date(latestUpdatedAt).toLocaleTimeString(locale(), {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      }
 
       const escapeHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (char) => ({
         '&': '&amp;',
@@ -556,7 +847,7 @@
       }
 
       function formatTemperature(value) {
-        return value === null ? '—' : `${value.toFixed(1).replace('.', ',')}°C`;
+        return value === null ? '—' : `${new Intl.NumberFormat(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)}°C`;
       }
 
       function formatBytes(value) {
@@ -569,7 +860,7 @@
           size /= 1024;
           unit += 1;
         }
-        return `${size.toFixed(unit > 0 && size < 10 ? 1 : 0).replace('.', ',')} ${units[unit]}`;
+        return `${new Intl.NumberFormat(locale(), { maximumFractionDigits: unit > 0 && size < 10 ? 1 : 0 }).format(size)} ${units[unit]}`;
       }
 
       function iconSvg(type) {
@@ -656,7 +947,7 @@
         const labelIndexes = [...new Set([0, 0.25, 0.5, 0.75, 1].map((fraction) => Math.round((count - 1) * fraction)))];
         const xLabels = labelIndexes.map((index) => {
           const time = chartHistory.times?.[index];
-          return time ? `<text class="chart-label" x="${xAt(index)}" y="${height - 5}" text-anchor="middle">${time}</text>` : '';
+          return time ? `<text class="chart-label" x="${xAt(index)}" y="${height - 5}" text-anchor="middle">${new Date(time).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })}</text>` : '';
         }).join('');
         const graphs = series.map((item) => {
           const values = Array(count - item.values.length).fill(null).concat(item.values);
@@ -684,17 +975,17 @@
 
       function renderHostRows(hosts) {
         const names = Object.keys(hosts);
-        if (!names.length) return '<div class="empty-row">Keine Hosts konfiguriert</div>';
+        if (!names.length) return `<div class="empty-row">${t('noHostsConfigured')}</div>`;
         return names.map((name) => {
           const host = hosts[name] || {};
           const online = Boolean(host.online);
           return `<div class="host-row">
             <div class="host-name-wrap">
               <div class="host-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
-              <div class="host-status ${online ? '' : 'offline'}"><span class="dot"></span> ${online ? 'Online' : 'Offline'}</div>
+              <div class="host-status ${online ? '' : 'offline'}"><span class="dot"></span> ${online ? t('online') : t('offline')}</div>
             </div>
-            ${[['CPU', host.cpu_percent], ['RAM', host.ram_percent], ['Disk', host.storage_percent], ['Temp', host.temperature_c]].map(([label, value]) => `
-              <div class="host-stat"><span>${label}</span>${online ? (label === 'Temp' ? formatTemperature(finite(value)) : formatPercent(finite(value))) : '—'}</div>
+            ${[[t('cpu'), host.cpu_percent, false], [t('ram'), host.ram_percent, false], [t('disk'), host.storage_percent, false], [t('temperature'), host.temperature_c, true]].map(([label, value, isTemperature]) => `
+              <div class="host-stat"><span>${label}</span>${online ? (isTemperature ? formatTemperature(finite(value)) : formatPercent(finite(value))) : '—'}</div>
             `).join('')}
           </div>`;
         }).join('');
@@ -702,19 +993,19 @@
 
       function renderHostResources(hosts) {
         const names = Object.keys(hosts);
-        if (!names.length) return '<div class="empty-row">Keine Host-Daten verfügbar</div>';
+        if (!names.length) return `<div class="empty-row">${t('noHostData')}</div>`;
         return names.map((name) => {
           const host = hosts[name] || {};
-          if (!host.online) return `<div class="resource-row"><div class="resource-host">${escapeHtml(name)}</div><div class="muted">Host offline</div><div class="resource-values">—</div></div>`;
+          if (!host.online) return `<div class="resource-row"><div class="resource-host">${escapeHtml(name)}</div><div class="muted">${t('offlineHost')}</div><div class="resource-values">—</div></div>`;
           const cpu = finite(host.cpu_percent);
           const ram = finite(host.ram_percent);
           return `<div class="resource-row">
             <div class="resource-host" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
-            <div class="resource-bars" aria-label="CPU ${formatPercent(cpu)}, RAM ${formatPercent(ram)}">
+            <div class="resource-bars" aria-label="${t('cpu')} ${formatPercent(cpu)}, ${t('ram')} ${formatPercent(ram)}">
               <div class="bar-track"><div class="bar-fill" style="width:${cpu === null ? 0 : Math.max(0, Math.min(cpu, 100))}%"></div></div>
               <div class="bar-track"><div class="bar-fill ram" style="width:${ram === null ? 0 : Math.max(0, Math.min(ram, 100))}%"></div></div>
             </div>
-            <div class="resource-values">CPU ${formatPercent(cpu)}<br>RAM ${formatPercent(ram)}</div>
+            <div class="resource-values">${t('cpu')} ${formatPercent(cpu)}<br>${t('ram')} ${formatPercent(ram)}</div>
           </div>`;
         }).join('');
       }
@@ -723,12 +1014,13 @@
         const rows = Object.entries(hosts).flatMap(([hostName, host]) =>
           (Array.isArray(host?.docker) ? host.docker : []).map((container) => ({ hostName, container }))
         );
-        if (!rows.length) return '<tr><td class="empty-row" colspan="5">Keine Container gefunden</td></tr>';
+        if (!rows.length) return `<tr><td class="empty-row" colspan="5">${t('noContainers')}</td></tr>`;
         return rows.map(({ hostName, container }) => {
-          const running = (container.state || container.status || '').toLowerCase().startsWith('running');
-          const state = container.state || container.status || 'Unbekannt';
+          const rawState = container.state || container.status || '';
+          const running = rawState.toLowerCase().startsWith('running');
+          const state = translations[currentLanguage][rawState.toLowerCase()] || rawState || t('unknown');
           const startedAt = container.started_at && !container.started_at.startsWith('0001-')
-            ? new Date(container.started_at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })
+            ? new Date(container.started_at).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' })
             : '—';
           return `<tr>
             <td>${escapeHtml(container.name)}</td>
@@ -742,25 +1034,25 @@
 
       function renderSecurity(hosts) {
         const entries = Object.entries(hosts);
-        if (!entries.length) return '<div class="empty-row">Keine Sicherheitsdaten verfügbar</div>';
+        if (!entries.length) return `<div class="empty-row">${t('noSecurityData')}</div>`;
         return entries.map(([name, host]) => {
           const ufw = host.ufw || {};
           const fail2ban = host.fail2ban || {};
           if (!host.online) {
-            return `<div class="security-host"><div class="security-host-name">${escapeHtml(name)}</div><span class="status-text bad">Host nicht erreichbar</span></div>`;
+            return `<div class="security-host"><div class="security-host-name">${escapeHtml(name)}</div><span class="status-text bad">${t('hostUnreachable')}</span></div>`;
           }
-          const ufwStatus = ufw.active ? 'Aktiv' : 'Inaktiv';
-          const failStatus = fail2ban.active ? 'Aktiv' : 'Inaktiv';
-          const ufwDetails = ufw.raw || 'Keine UFW-Ausgabe';
+          const ufwStatus = ufw.active ? t('active') : t('inactive');
+          const failStatus = fail2ban.active ? t('active') : t('inactive');
+          const ufwDetails = ufw.raw || t('noUfwOutput');
           const jailDetails = Array.isArray(fail2ban.jails) && fail2ban.jails.length
-            ? fail2ban.jails.map((jail) => `${jail}\n${fail2ban.details?.[jail] || 'Keine Details verfügbar'}`).join('\n\n')
-            : (fail2ban.raw || 'Keine aktiven Jails');
+            ? fail2ban.jails.map((jail) => `${jail}\n${fail2ban.details?.[jail] || t('noDetailsAvailable')}`).join('\n\n')
+            : (fail2ban.raw || t('noActiveJails'));
           return `<div class="security-host">
             <div class="security-host-name">${escapeHtml(name)}</div>
-            <div class="security-state-row"><span>UFW Firewall</span><span class="status-text ${ufw.active ? '' : 'bad'}">${ufwStatus}</span></div>
-            <div class="security-state-row"><span>Fail2Ban · ${(fail2ban.jails || []).length} Jails</span><span class="status-text ${fail2ban.active ? '' : 'bad'}">${failStatus}</span></div>
-            <details><summary>Firewall-Regeln anzeigen</summary><div class="security-detail">${escapeHtml(ufwDetails)}</div></details>
-            <details><summary>Fail2Ban-Details anzeigen</summary><div class="security-detail">${escapeHtml(jailDetails)}</div></details>
+            <div class="security-state-row"><span>${t('ufwFirewall')}</span><span class="status-text ${ufw.active ? '' : 'bad'}">${ufwStatus}</span></div>
+            <div class="security-state-row"><span>${t('fail2banJails', { count: (fail2ban.jails || []).length })}</span><span class="status-text ${fail2ban.active ? '' : 'bad'}">${failStatus}</span></div>
+            <details><summary>${t('firewallRules')}</summary><div class="security-detail">${escapeHtml(ufwDetails)}</div></details>
+            <details><summary>${t('fail2banDetails')}</summary><div class="security-detail">${escapeHtml(jailDetails)}</div></details>
           </div>`;
         }).join('');
       }
@@ -778,51 +1070,53 @@
           if (chartHistory[key].length > maxHistory) chartHistory[key].shift();
         });
         chartHistory.times ||= [];
-        chartHistory.times.push(new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }));
+        chartHistory.times.push(Date.now());
         if (chartHistory.times.length > maxHistory) chartHistory.times.shift();
         return sample;
       }
 
-      function renderDashboard(hosts) {
-        const sample = addHistory(hosts);
+      function renderDashboard(hosts, sample = addHistory(hosts)) {
+        latestDashboard = hosts;
+        latestSample = sample;
         const names = Object.keys(hosts);
         const onlineCount = Object.values(hosts).filter((host) => host?.online).length;
         const dockerCount = Object.values(hosts).reduce((total, host) => total + (Array.isArray(host?.docker) ? host.docker.length : 0), 0);
         const temps = Object.values(hosts).filter((host) => host?.online).map((host) => finite(host.temperature_c)).filter((value) => value !== null);
-        const tempRange = temps.length ? `${Math.min(...temps).toFixed(1).replace('.', ',')}° – ${Math.max(...temps).toFixed(1).replace('.', ',')}°` : 'Keine Temperaturdaten';
+        const numberFormat = new Intl.NumberFormat(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        const tempRange = temps.length ? `${numberFormat.format(Math.min(...temps))}° – ${numberFormat.format(Math.max(...temps))}°` : t('noTemperatureData');
         const diskFree = Object.values(hosts).filter((host) => host?.online).map((host) => host.storage_free_bytes).filter((value) => finite(value) !== null);
         const metricCards = [
-          renderMetric('cpu', 'CPU', formatPercent(sample.cpu), 'Ø Auslastung', `${onlineCount} von ${names.length} Hosts online`),
-          renderMetric('ram', 'RAM', formatPercent(sample.ram), 'Ø Auslastung', 'Über alle erreichbaren Hosts'),
-          renderMetric('disk', 'Speicher', formatPercent(sample.disk), 'Ø Belegung', diskFree.length ? `${formatBytes(diskFree.reduce((sum, value) => sum + Number(value), 0))} frei` : 'Root-Dateisystem'),
-          renderMetric('temperature', 'Temperatur', formatTemperature(sample.temperature), 'Ø aller Hosts', tempRange)
+          renderMetric('cpu', t('cpu'), formatPercent(sample.cpu), t('averageUsage'), t('onlineHosts', { online: onlineCount, total: names.length })),
+          renderMetric('ram', t('ram'), formatPercent(sample.ram), t('averageUsage'), t('allReachableHosts')),
+          renderMetric('disk', t('disk'), formatPercent(sample.disk), t('averageOccupancy'), diskFree.length ? `${formatBytes(diskFree.reduce((sum, value) => sum + Number(value), 0))} ${t('free')}` : t('rootFilesystem')),
+          renderMetric('temperature', t('temperature'), formatTemperature(sample.temperature), t('averageAllHosts'), tempRange)
         ].join('');
         const systemState = document.querySelector('#system-state');
-        systemState.innerHTML = `<span class="dot"></span>${onlineCount === names.length && names.length ? 'Alle Systeme online' : `${onlineCount} von ${names.length} Hosts online`}`;
+        systemState.innerHTML = `<span class="dot"></span>${onlineCount === names.length && names.length ? t('allSystemsOnline') : t('onlineHosts', { online: onlineCount, total: names.length })}`;
         systemState.style.color = onlineCount === names.length && names.length ? 'var(--cyan)' : 'var(--amber)';
 
         document.querySelector('#app').innerHTML = `
           <div class="metrics-grid">${metricCards}</div>
           <section class="panel hosts-panel" id="hosts">
-            <div class="panel-heading"><h2 class="panel-title">Hosts</h2><span class="panel-meta">${onlineCount} online</span></div>
+            <div class="panel-heading"><h2 class="panel-title">${t('hosts')}</h2><span class="panel-meta">${t('hostsOnline', { count: onlineCount })}</span></div>
             ${renderHostRows(hosts)}
           </section>
-          ${renderChart('Systemressourcen', [
-            { label: 'CPU', color: colors.cpu, values: chartHistory.cpu },
-            { label: 'RAM', color: colors.ram, values: chartHistory.ram },
-            { label: 'Speicher', color: colors.disk, values: chartHistory.disk }
+          ${renderChart(t('systemResources'), [
+            { label: t('cpu'), color: colors.cpu, values: chartHistory.cpu },
+            { label: t('ram'), color: colors.ram, values: chartHistory.ram },
+            { label: t('disk'), color: colors.disk, values: chartHistory.disk }
           ], { className: 'resource-panel' })}
-          ${renderChart('Temperaturverlauf', [
-            { label: 'Temperatur', color: colors.temperature, values: chartHistory.temperature }
+          ${renderChart(t('temperatureTrend'), [
+            { label: t('temperature'), color: colors.temperature, values: chartHistory.temperature }
           ], { className: 'temperature-panel', max: 60, ticks: [20, 30, 40, 50, 60], suffix: '°' })}
           <section class="panel containers-panel" id="containers">
             <div class="panel-heading">
-              <h2 class="panel-title">Container-Services</h2>
-              <span class="panel-meta">${dockerCount} Container</span>
+              <h2 class="panel-title">${t('containerServices')}</h2>
+              <span class="panel-meta">${t(dockerCount === 1 ? 'containerCountSingular' : 'containerCountPlural', { count: dockerCount })}</span>
             </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Container</th><th>Host</th><th>Status</th><th>Gestartet</th><th>Restarts</th></tr></thead>
+                <thead><tr><th>${t('containers')}</th><th>${t('host')}</th><th>${t('status')}</th><th>${t('started')}</th><th>${t('restarts')}</th></tr></thead>
                 <tbody>${renderContainers(hosts)}</tbody>
               </table>
             </div>
@@ -830,14 +1124,14 @@
           <div class="side-stack">
             <section class="panel">
               <div class="panel-heading">
-                <h2 class="panel-title">Host-Ressourcen</h2>
-                ${legend([['CPU', colors.cpu], ['RAM', colors.ram]])}
+                <h2 class="panel-title">${t('hostResources')}</h2>
+                ${legend([[t('cpu'), colors.cpu], [t('ram'), colors.ram]])}
               </div>
               <div class="resource-list">${renderHostResources(hosts)}</div>
             </section>
             <section class="panel" id="security">
               <div class="panel-heading">
-                <h2 class="panel-title">Sicherheitsstatus</h2>
+                <h2 class="panel-title">${t('securityStatus')}</h2>
                 <span class="panel-meta">UFW · Fail2Ban</span>
               </div>
               <div class="security-content">${renderSecurity(hosts)}</div>
@@ -851,18 +1145,21 @@
         const errorBanner = document.querySelector('#error-banner');
         try {
           const response = await fetch('/api/dashboard');
-          if (!response.ok) throw new Error(`Dashboard-API antwortet mit HTTP ${response.status}`);
+          if (!response.ok) throw new Error(t('apiHttpError', { status: response.status }));
           const data = await response.json();
           if (!data || typeof data !== 'object' || Array.isArray(data)) {
-            throw new Error('Die Dashboard-API hat ein ungültiges Datenformat geliefert');
+            throw new Error(t('invalidData'));
           }
           renderDashboard(data);
+          latestError = null;
           errorBanner.hidden = true;
-          document.querySelector('#updated').textContent = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          latestUpdatedAt = Date.now();
+          updateTimestamp();
         } catch (error) {
-          errorBanner.textContent = `Dashboard konnte nicht aktualisiert werden: ${error.message || error}`;
+          latestError = error.message || String(error);
+          errorBanner.textContent = t('dashboardUpdateError', { error: latestError });
           errorBanner.hidden = false;
-          document.querySelector('#system-state').innerHTML = '<span class="dot"></span>Verbindung gestört';
+          document.querySelector('#system-state').innerHTML = `<span class="dot"></span>${t('connectionError')}`;
           document.querySelector('#system-state').style.color = 'var(--red)';
         } finally {
           loading = false;
@@ -875,6 +1172,19 @@
         });
       });
 
+      document.querySelector('#language-select').addEventListener('change', (event) => {
+        currentLanguage = event.target.value;
+        localStorage.setItem('homelab-dashboard-language', currentLanguage);
+        applyTranslations();
+        updateTimestamp();
+        if (latestDashboard) renderDashboard(latestDashboard, latestSample);
+        if (latestError) {
+          document.querySelector('#system-state').innerHTML = `<span class="dot"></span>${t('connectionError')}`;
+          document.querySelector('#error-banner').textContent = t('dashboardUpdateError', { error: latestError });
+        }
+      });
+
+      applyTranslations();
       loadDashboard();
       setInterval(loadDashboard, 15000);
     </script>
