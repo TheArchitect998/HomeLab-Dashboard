@@ -2,340 +2,867 @@
 <html lang="de">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>HomeLab Dashboard v3</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#071321" />
+    <title>Homelab Monitor</title>
     <style>
       :root {
-        --bg: #111827;
-        --panel: #1f2937;
-        --panel-alt: #0f172a;
-        --border: #374151;
-        --text: #edf2f7;
-        --muted: #9ca3af;
-        --ok: #34d399;
-        --bad: #f87171;
-        --accent: #93c5fd;
+        color-scheme: dark;
+        --bg: #071321;
+        --surface: #0b1a2b;
+        --surface-raised: #0e2034;
+        --surface-hover: #132a43;
+        --border: #1a3551;
+        --text: #e4efff;
+        --muted: #829ab8;
+        --blue: #229cff;
+        --cyan: #12c9c3;
+        --purple: #a45bff;
+        --green: #10d1b3;
+        --red: #ff6b73;
+        --amber: #ffbf5b;
+        --sidebar-width: 154px;
       }
 
       * { box-sizing: border-box; }
+
+      html { scroll-behavior: smooth; }
+
       body {
+        min-width: 320px;
+        min-height: 100vh;
         margin: 0;
-        background: var(--bg);
+        background:
+          radial-gradient(ellipse at 68% -20%, rgba(19, 77, 123, 0.18), transparent 50%),
+          var(--bg);
         color: var(--text);
-        font: 16px/1.45 system-ui, sans-serif;
+        font: 13px/1.45 Inter, "Segoe UI", system-ui, sans-serif;
       }
 
-      header {
-        padding: 16px 24px;
-        background: #0f172a;
-        border-bottom: 1px solid var(--border);
-      }
+      button, a { font: inherit; }
+      a { color: inherit; text-decoration: none; }
 
-      header b { font-size: 1.4rem; }
-      header .muted { font-size: 0.9rem; }
-
-      main {
-        padding: 16px;
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 14px;
-      }
-
-      .card {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 12px 14px;
-      }
-
-      .card h2 {
-        margin: 0 0 10px;
-        font-size: 1.3rem;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 8px;
-      }
-
-      .box {
-        background: rgba(255,255,255,0.03);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 10px 8px;
-        text-align: center;
-      }
-
-      .label {
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        color: var(--muted);
-      }
-
-      .value {
-        display: block;
-        margin-top: 6px;
-        font-weight: 700;
-        font-size: 1.3rem;
-      }
-
-      .status-row {
+      .topbar {
+        position: sticky;
+        z-index: 5;
+        top: 0;
         display: flex;
+        min-height: 48px;
+        align-items: center;
         justify-content: space-between;
-        padding: 8px 0;
-        font-size: 1rem;
+        gap: 18px;
+        padding: 8px 18px;
+        background: rgba(7, 19, 33, 0.96);
+        border-bottom: 1px solid #142b43;
+        backdrop-filter: blur(12px);
       }
 
-      .section {
-        background: var(--panel-alt);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 8px 10px;
-        margin-top: 10px;
+      .brand {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 12px;
       }
 
-      .section-title {
-        font-size: 0.9rem;
-        text-transform: uppercase;
-        color: var(--accent);
-        margin-bottom: 6px;
+      .brand-mark {
+        width: 25px;
+        height: 25px;
+        color: var(--cyan);
       }
 
-      .section-content {
-        max-height: 120px;
-        overflow-y: auto;
-        line-height: 1.5;
-        white-space: pre-wrap;
-        word-break: break-all;
-        font-size: 0.9rem;
+      .brand-title {
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.15;
       }
 
-      .ufw-table-wrap {
-        overflow-x: auto;
-      }
-
-      .ufw-table {
-        width: 100%;
-        border-collapse: collapse;
-        min-width: 240px;
-        table-layout: fixed;
-      }
-
-      .ufw-table th,
-      .ufw-table td {
-        padding: 6px 8px;
-        border-bottom: 1px solid var(--border);
-        text-align: left;
-        font-size: 0.9rem;
-        vertical-align: top;
-      }
-
-      .ufw-table th {
+      .brand-subtitle {
+        margin-top: 2px;
         color: var(--muted);
-        text-transform: uppercase;
+        font-size: 10px;
       }
 
-      .docker-table {
+      .topbar-meta {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: var(--muted);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+
+      .system-state, .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .system-state { color: var(--cyan); }
+
+      .dot {
+        width: 7px;
+        height: 7px;
+        flex: 0 0 7px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+
+      .layout {
+        display: grid;
+        min-height: calc(100vh - 48px);
+        grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 48px;
+        display: flex;
+        height: calc(100vh - 48px);
+        flex-direction: column;
+        gap: 4px;
+        padding: 14px 8px;
+        border-right: 1px solid #112941;
+        background: rgba(8, 22, 38, 0.72);
+      }
+
+      .nav-link {
+        display: flex;
+        min-height: 34px;
+        align-items: center;
+        gap: 10px;
+        padding: 0 10px;
+        border-radius: 6px;
+        color: #8ca6c4;
+        font-size: 11px;
+        transition: background 120ms ease, color 120ms ease;
+      }
+
+      .nav-link:hover, .nav-link.active {
+        background: #102b47;
+        color: #4aaeff;
+      }
+
+      .nav-icon {
+        width: 15px;
+        height: 15px;
+        color: currentColor;
+      }
+
+      .sidebar-note {
+        margin: auto 8px 4px;
+        color: #627b99;
+        font-size: 10px;
+      }
+
+      .content {
         width: 100%;
-        border-collapse: collapse;
-        margin-top: 10px;
-        table-layout: fixed;
+        max-width: 1720px;
+        margin: 0 auto;
+        padding: 15px 17px 24px;
       }
 
-      .docker-table th,
-      .docker-table td {
-        padding: 7px 6px;
-        border-bottom: 1px solid var(--border);
+      .error-banner {
+        margin-bottom: 12px;
+        padding: 9px 12px;
+        border: 1px solid rgba(255, 107, 115, 0.35);
+        border-radius: 6px;
+        background: rgba(255, 107, 115, 0.08);
+        color: #ff9a9f;
+      }
+
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 12px;
+        align-items: start;
+      }
+
+      .metrics-grid {
+        display: grid;
+        grid-column: span 9;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .panel, .metric-card {
+        min-width: 0;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        background: linear-gradient(145deg, rgba(13, 31, 51, 0.98), rgba(9, 25, 42, 0.98));
+        box-shadow: 0 5px 16px rgba(0, 0, 0, 0.12);
+      }
+
+      .metric-card {
+        position: relative;
+        min-height: 150px;
+        padding: 13px 12px 9px;
+      }
+
+      .metric-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .metric-icon {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+        place-items: center;
+        border-radius: 5px;
+        background: rgba(34, 156, 255, 0.13);
+        color: var(--blue);
+      }
+
+      .metric-card[data-metric="ram"] .metric-icon { background: rgba(18, 201, 195, 0.12); color: var(--cyan); }
+      .metric-card[data-metric="disk"] .metric-icon { background: rgba(164, 91, 255, 0.13); color: var(--purple); }
+      .metric-card[data-metric="temperature"] .metric-icon { background: rgba(18, 201, 195, 0.1); color: var(--cyan); }
+      .metric-icon svg { width: 21px; height: 21px; }
+
+      .metric-label {
+        color: #a9bfdc;
+        font-size: 11px;
+        font-weight: 650;
+      }
+
+      .metric-value {
+        margin: 2px 0 0 42px;
+        font-size: 21px;
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        line-height: 1.1;
+      }
+
+      .metric-caption {
+        margin: 3px 0 0 42px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .sparkline {
+        display: block;
+        width: 100%;
+        height: 33px;
+        margin-top: 6px;
+        overflow: visible;
+      }
+
+      .metric-foot {
+        color: #829bb8;
+        font-size: 9px;
+      }
+
+      .panel { scroll-margin-top: 62px; }
+
+      .panel-heading {
+        display: flex;
+        min-height: 36px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 11px;
+        border-bottom: 1px solid #17314b;
+      }
+
+      .panel-title {
+        margin: 0;
+        font-size: 11px;
+        font-weight: 650;
+      }
+
+      .panel-meta {
+        color: var(--muted);
+        font-size: 9px;
+      }
+
+      .hosts-panel { grid-column: span 3; }
+      .resource-panel { grid-column: span 7; }
+      .temperature-panel { grid-column: span 5; }
+      .containers-panel { grid-column: span 7; }
+      .side-stack { display: grid; grid-column: span 5; gap: 12px; }
+
+      .host-row {
+        display: grid;
+        min-height: 58px;
+        grid-template-columns: minmax(82px, 1fr) repeat(4, minmax(33px, auto));
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-bottom: 1px solid rgba(26, 53, 81, 0.7);
+      }
+
+      .host-row:last-child { border-bottom: 0; }
+
+      .host-name-wrap { min-width: 0; }
+      .host-name {
+        overflow: hidden;
+        font-size: 10px;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .host-status {
+        margin-top: 3px;
+        color: var(--green);
+        font-size: 9px;
+      }
+
+      .host-status.offline { color: var(--red); }
+
+      .host-stat {
+        text-align: right;
+        color: #c3d4e9;
+        font-size: 9px;
+      }
+
+      .host-stat span {
+        display: block;
+        margin-bottom: 2px;
+        color: var(--muted);
+        font-size: 8px;
+      }
+
+      .chart-wrap { padding: 7px 10px 8px; }
+      .chart-svg { display: block; width: 100%; height: 178px; }
+      .chart-grid { stroke: #1b3550; stroke-width: 1; }
+      .chart-label { fill: #8199b5; font: 9px "Segoe UI", sans-serif; }
+      .chart-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .chart-area { opacity: 0.11; }
+
+      .legend {
+        display: inline-flex;
+        align-items: center;
+        gap: 11px;
+        color: var(--muted);
+        font-size: 9px;
+        white-space: nowrap;
+      }
+
+      .legend-item { display: inline-flex; align-items: center; gap: 5px; }
+      .legend-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+      .table-wrap { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td {
+        padding: 7px 9px;
+        border-bottom: 1px solid rgba(26, 53, 81, 0.75);
         text-align: left;
-        font-size: 0.9rem;
-        vertical-align: top;
-        word-break: break-word;
+        font-size: 10px;
+        white-space: nowrap;
       }
 
-      .docker-table th:nth-child(1), .docker-table td:nth-child(1) { width: 38%; }
-      .docker-table th:nth-child(2), .docker-table td:nth-child(2) { width: 16%; }
-      .docker-table th:nth-child(3), .docker-table td:nth-child(3) { width: 30%; }
-      .docker-table th:nth-child(4), .docker-table td:nth-child(4) { width: 16%; }
+      th {
+        color: #91a9c5;
+        font-size: 9px;
+        font-weight: 550;
+      }
 
-      .ok { color: var(--ok); }
-      .bad { color: var(--bad); }
+      tbody tr:last-child td { border-bottom: 0; }
+      tbody tr:hover { background: rgba(36, 76, 115, 0.14); }
+
+      .status-text { color: var(--green); }
+      .status-text.bad { color: var(--red); }
+      .status-text.warn { color: var(--amber); }
+      .empty-row { padding: 18px 10px; color: var(--muted); text-align: center; }
+
+      .resource-list { padding: 4px 11px 9px; }
+      .resource-row {
+        display: grid;
+        grid-template-columns: minmax(96px, 1.05fr) minmax(70px, 1.7fr) 48px;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 0;
+      }
+
+      .resource-host {
+        overflow: hidden;
+        font-size: 10px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .resource-bars { display: grid; gap: 4px; }
+      .bar-track { height: 6px; overflow: hidden; border-radius: 8px; background: #19304a; }
+      .bar-fill { height: 100%; border-radius: inherit; background: var(--blue); }
+      .bar-fill.ram { background: var(--cyan); }
+      .resource-values { color: #b7c9df; font-size: 9px; text-align: right; line-height: 1.5; }
+
+      .security-content { padding: 7px 11px 10px; }
+      .security-host {
+        padding: 7px 0;
+        border-bottom: 1px solid rgba(26, 53, 81, 0.7);
+      }
+
+      .security-host:last-child { border-bottom: 0; }
+      .security-host-name { margin-bottom: 5px; font-size: 10px; font-weight: 650; }
+      .security-state-row { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 9px; }
+      .security-state-row + .security-state-row { margin-top: 4px; }
+
+      details { margin-top: 6px; color: #91a9c5; font-size: 9px; }
+      summary { cursor: pointer; }
+      .security-detail {
+        max-height: 110px;
+        margin-top: 5px;
+        overflow: auto;
+        color: #afc2d9;
+        font: 9px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
       .muted { color: var(--muted); }
 
+      @media (max-width: 1120px) {
+        :root { --sidebar-width: 132px; }
+        .metrics-grid { grid-column: span 12; }
+        .hosts-panel { grid-column: span 12; }
+        .hosts-panel .host-row { grid-template-columns: minmax(130px, 1fr) repeat(4, minmax(45px, auto)); }
+        .resource-panel, .temperature-panel { grid-column: span 6; }
+        .containers-panel, .side-stack { grid-column: span 6; }
+      }
+
+      @media (max-width: 720px) {
+        :root { --sidebar-width: 0px; }
+        .layout { display: block; }
+        .sidebar {
+          position: sticky;
+          z-index: 4;
+          top: 48px;
+          display: flex;
+          width: 100%;
+          height: auto;
+          flex-direction: row;
+          overflow-x: auto;
+          padding: 5px 8px;
+          border-right: 0;
+          border-bottom: 1px solid #112941;
+        }
+        .nav-link { min-height: 32px; flex: 0 0 auto; padding: 0 9px; }
+        .sidebar-note { display: none; }
+        .content { padding: 11px 10px 20px; }
+        .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .metric-card { min-height: 140px; padding: 11px 9px 8px; }
+        .dashboard-grid { gap: 9px; }
+        .resource-panel, .temperature-panel, .containers-panel, .side-stack { grid-column: span 12; }
+        .chart-svg { height: 165px; }
+        .topbar-meta { gap: 8px; }
+        .topbar-meta .updated-label { display: none; }
+      }
+
       @media (max-width: 420px) {
-        .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        body { font-size: 14px; }
-        .value { font-size: 1.2rem; }
+        .brand-subtitle { display: none; }
+        .topbar { padding-right: 10px; padding-left: 10px; }
+        .system-state { max-width: 118px; overflow: hidden; text-overflow: ellipsis; }
+        .host-row { grid-template-columns: minmax(75px, 1fr) repeat(4, minmax(30px, auto)); gap: 5px; padding-right: 7px; padding-left: 7px; }
+        th, td { padding-right: 7px; padding-left: 7px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
       }
     </style>
   </head>
   <body>
-    <header>
-      <b>HomeLab Dashboard</b>
-      <span class="muted" id="updated">Lade…</span>
+    <header class="topbar">
+      <a class="brand" href="#overview" aria-label="Homelab Monitor Übersicht">
+        <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="m12 2 9 4.5-9 4.5-9-4.5L12 2Z" />
+          <path d="m3 11 9 4.5 9-4.5M3 16l9 5 9-5M3 6.5V16m18-9.5V16M7 8.5v4m10-4v4" />
+        </svg>
+        <span>
+          <span class="brand-title">Homelab Monitor</span>
+          <span class="brand-subtitle">Infrastructure Overview</span>
+        </span>
+      </a>
+      <div class="topbar-meta">
+        <span id="system-state" class="system-state"><span class="dot"></span>Lade Status</span>
+        <span aria-hidden="true">|</span>
+        <span><span class="updated-label">Aktualisiert </span><time id="updated">—</time></span>
+      </div>
     </header>
-    <main id="app"></main>
+
+    <div class="layout">
+      <nav class="sidebar" aria-label="Hauptnavigation">
+        <a class="nav-link active" href="#overview">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9Z" /></svg>
+          Übersicht
+        </a>
+        <a class="nav-link" href="#hosts">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="7" rx="1" /><rect x="3" y="14" width="18" height="7" rx="1" /><path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6" /></svg>
+          Hosts
+        </a>
+        <a class="nav-link" href="#containers">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5M3 16l9 5 9-5" /></svg>
+          Container
+        </a>
+        <a class="nav-link" href="#security">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" /><path d="m9 12 2 2 4-4" /></svg>
+          Sicherheit
+        </a>
+        <span class="sidebar-note">Abfrage alle 15 Sekunden</span>
+      </nav>
+
+      <main class="content" id="overview">
+        <div id="error-banner" class="error-banner" role="status" hidden></div>
+        <div id="app" class="dashboard-grid" aria-live="polite">
+          <section class="panel" style="grid-column: 1 / -1; padding: 18px; color: var(--muted)">
+            Dashboard wird geladen …
+          </section>
+        </div>
+      </main>
+    </div>
+
     <script>
-      const escapeHtml = (value) => {
-        const text = String(value ?? '—');
-        return text.replace(/[&<>\"']/g, (char) => ({
-          '&': '&amp;',
-          '<': '&lt;',
-          '>': '&gt;',
-          '\"': '&quot;',
-          "'": '&#39;'
-        }[char]));
+      const chartHistory = { cpu: [], ram: [], disk: [], temperature: [] };
+      const maxHistory = 36;
+      const colors = { cpu: '#229cff', ram: '#12c9c3', disk: '#a45bff', temperature: '#12c9c3' };
+      let loading = false;
+
+      const escapeHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+
+      const finite = (value) => {
+        if (value === null || value === undefined || value === '') return null;
+        const number = Number(value);
+        return Number.isFinite(number) ? number : null;
       };
 
-      const normalizeJailName = (value) => String(value || '').replace(/^[-`\s]+/, '').trim();
+      function average(values) {
+        const valid = values.map(finite).filter((value) => value !== null);
+        return valid.length ? valid.reduce((sum, value) => sum + value, 0) / valid.length : null;
+      }
 
-      function renderUfwRows(rawUfw) {
-        const raw = String(rawUfw || '').trim();
-        if (!raw) return '<tr><td colspan="3">Keine UFW-Ausgabe</td></tr>';
+      function formatPercent(value) {
+        return value === null ? '—' : `${Math.round(value)}%`;
+      }
 
-        const lines = raw
-          .split(/\n/)
-          .map((line) => line.trim())
-          .filter((line) => line && !line.startsWith('To') && !line.startsWith('--'));
+      function formatTemperature(value) {
+        return value === null ? '—' : `${value.toFixed(1).replace('.', ',')}°C`;
+      }
 
-        if (!lines.length) return '<tr><td colspan="3">Keine UFW-Ausgabe</td></tr>';
+      function formatBytes(value) {
+        const bytes = finite(value);
+        if (bytes === null) return '—';
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let size = bytes;
+        let unit = 0;
+        while (size >= 1024 && unit < units.length - 1) {
+          size /= 1024;
+          unit += 1;
+        }
+        return `${size.toFixed(unit > 0 && size < 10 ? 1 : 0).replace('.', ',')} ${units[unit]}`;
+      }
 
-        return lines.map((line) => {
-          const parts = line.split(/\s+/);
-          if (parts.length < 3) {
-            return `<tr><td colspan="3">${escapeHtml(line)}</td></tr>`;
+      function iconSvg(type) {
+        const paths = {
+          cpu: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v3m6-3v3M9 20v3m6-3v3M1 9h3m-3 6h3m16-6h3m-3 6h3M9 9h6v6H9z"/>',
+          ram: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h2v4H7zm4 0h2v4h-2zm4 0h2v4h-2zM7 3v3m5-3v3m5-3v3M7 18v3m5-3v3m5-3v3"/>',
+          disk: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+          temperature: '<path d="M14 14.76V5a3 3 0 0 0-6 0v9.76a5 5 0 1 0 6 0Z"/><path d="M11 11v6"/>'
+        };
+        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[type]}</svg>`;
+      }
+
+      function linePath(values, maxValue, width, height, top = 5, bottom = 5) {
+        const usableHeight = height - top - bottom;
+        const denominator = Math.max(values.length - 1, 1);
+        let path = '';
+        let drawing = false;
+        values.forEach((value, index) => {
+          if (finite(value) === null) {
+            drawing = false;
+            return;
           }
-
-          const to = parts[0];
-          const action = parts.slice(1, -1).join(' ');
-          const from = parts[parts.length - 1];
-
-          return `
-            <tr>
-              <td>${escapeHtml(to)}</td>
-              <td>${escapeHtml(action)}</td>
-              <td>${escapeHtml(from)}</td>
-            </tr>
-          `;
-        }).join('');
+          const x = (index / denominator) * width;
+          const y = top + usableHeight - (Math.max(0, Math.min(Number(value), maxValue)) / maxValue) * usableHeight;
+          path += `${drawing ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)} `;
+          drawing = true;
+        });
+        return path.trim();
       }
 
-      function renderDockerRows(dockerList) {
-        if (!Array.isArray(dockerList) || dockerList.length === 0) {
-          return '<tr><td colspan="4">Keine Container</td></tr>';
-        }
-
-        return dockerList.map((container) => {
-          const state = container.state || container.status || 'unknown';
-          const startedAt = container.started_at ? new Date(container.started_at).toLocaleString() : '—';
-          const statusClass = state === 'running' ? 'ok' : 'bad';
-          return `
-            <tr>
-              <td>${escapeHtml(container.name)}</td>
-              <td><span class="${statusClass}">${escapeHtml(state)}</span></td>
-              <td>${escapeHtml(startedAt)}</td>
-              <td>${escapeHtml(container.restart_count ?? 0)}</td>
-            </tr>
-          `;
-        }).join('');
+      function renderSparkline(type) {
+        const values = chartHistory[type];
+        const path = linePath(values, 100, 220, 30, 3, 3);
+        if (!path) return '<svg class="sparkline" viewBox="0 0 220 30" aria-hidden="true"></svg>';
+        const area = `${path} L220,30 L0,30 Z`;
+        const marker = values.length === 1 && finite(values[0]) !== null
+          ? `<circle cx="0" cy="${27 - (Math.max(0, Math.min(Number(values[0]), 100)) / 100) * 24}" r="2" fill="${colors[type]}"></circle>`
+          : '';
+        return `<svg class="sparkline" viewBox="0 0 220 30" preserveAspectRatio="none" aria-hidden="true">
+          <path d="${area}" fill="${colors[type]}" opacity=".12"></path>
+          <path d="${path}" fill="none" stroke="${colors[type]}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+          ${marker}
+        </svg>`;
       }
 
-      function renderJailCards(fail2banData) {
-        const jails = Array.isArray(fail2banData?.jails) ? fail2banData.jails : [];
-        if (!jails.length) return '<div class="muted">Keine Jails aktiv</div>';
-
-        return jails.map((rawJail) => {
-          const jailName = normalizeJailName(rawJail);
-          const detail = fail2banData.details?.[jailName] || fail2banData.details?.[rawJail] || 'Keine Details verfügbar';
-          return `
-            <div class="section">
-              <div class="section-title">${escapeHtml(jailName)}</div>
-              <div class="section-content">${escapeHtml(detail)}</div>
-            </div>
-          `;
-        }).join('');
-      }
-
-      function renderHostInner(name, data) {
-        if (!data.online) {
-          return `
-            <h2>${escapeHtml(name)} <span class="bad">offline</span></h2>
-            <div class="bad">${escapeHtml(data.error || 'Host nicht erreichbar')}</div>
-          `;
-        }
-
-        const fail2ban = data.fail2ban || {};
-        const ufw = data.ufw || {};
-
-        return `
-          <h2>${escapeHtml(name)} <span class="ok">online</span></h2>
-          <div class="grid">
-            <div class="box"><span class="label">Temp</span><span class="value">${escapeHtml(data.temperature_c)}°C</span></div>
-            <div class="box"><span class="label">CPU</span><span class="value">${escapeHtml(data.cpu_percent)}%</span></div>
-            <div class="box"><span class="label">RAM</span><span class="value">${escapeHtml(data.ram_percent)}%</span></div>
-            <div class="box"><span class="label">Disk</span><span class="value">${escapeHtml(data.storage_percent)}%</span></div>
+      function renderMetric(type, label, value, caption, foot) {
+        const trend = type === 'temperature' ? 'temperature' : type;
+        return `<section class="metric-card" data-metric="${type}">
+          <div class="metric-head">
+            <span class="metric-icon">${iconSvg(type)}</span>
+            <span class="metric-label">${label}</span>
           </div>
+          <div class="metric-value">${value}</div>
+          <div class="metric-caption">${caption}</div>
+          ${renderSparkline(trend)}
+          <div class="metric-foot">${foot}</div>
+        </section>`;
+      }
 
-          <div class="status-row"><span>UFW</span><span>${ufw.active ? '<span class="ok">Aktiv</span>' : '<span class="bad">Inaktiv</span>'}</span></div>
-          <div class="section">
-            <div class="ufw-table-wrap">
-              <table class="ufw-table">
-                <thead>
-                  <tr><th>To</th><th>Action</th><th>From</th></tr>
-                </thead>
-                <tbody>${renderUfwRows(ufw.raw)}</tbody>
+      function legend(items) {
+        return `<span class="legend">${items.map(([label, color]) => `
+          <span class="legend-item"><span class="legend-dot" style="background:${color}"></span>${label}</span>
+        `).join('')}</span>`;
+      }
+
+      function renderChart(title, series, options = {}) {
+        const width = 560;
+        const height = 178;
+        const left = 35;
+        const right = 8;
+        const top = 10;
+        const bottom = 25;
+        const plotWidth = width - left - right;
+        const plotHeight = height - top - bottom;
+        const maxValue = options.max || 100;
+        const ticks = options.ticks || [0, 25, 50, 75, 100];
+        const count = Math.max(...series.map((item) => item.values.length), 0);
+        const xAt = (index) => left + (index / Math.max(count - 1, 1)) * plotWidth;
+        const yAt = (value) => top + plotHeight - (value / maxValue) * plotHeight;
+        const grid = ticks.map((tick) => `
+          <line class="chart-grid" x1="${left}" y1="${yAt(tick)}" x2="${width - right}" y2="${yAt(tick)}"></line>
+          <text class="chart-label" x="${left - 7}" y="${yAt(tick) + 3}" text-anchor="end">${tick}${options.suffix || '%'}</text>
+        `).join('');
+        const labelIndexes = [...new Set([0, 0.25, 0.5, 0.75, 1].map((fraction) => Math.round((count - 1) * fraction)))];
+        const xLabels = labelIndexes.map((index) => {
+          const time = chartHistory.times?.[index];
+          return time ? `<text class="chart-label" x="${xAt(index)}" y="${height - 5}" text-anchor="middle">${time}</text>` : '';
+        }).join('');
+        const graphs = series.map((item) => {
+          const values = Array(count - item.values.length).fill(null).concat(item.values);
+          const path = linePath(values, maxValue, plotWidth, plotHeight, 0, 0);
+          const shiftedPath = path.replace(/([ML])([\d.]+),([\d.]+)/g, (_, command, x, y) => `${command}${(Number(x) + left).toFixed(1)},${(Number(y) + top).toFixed(1)}`);
+          const currentValue = finite(item.values[item.values.length - 1]);
+          const marker = count === 1 && currentValue !== null
+            ? `<circle cx="${left}" cy="${yAt(Math.max(0, Math.min(currentValue, maxValue)))}" r="3" fill="${item.color}"></circle>`
+            : '';
+          return `<path class="chart-line" d="${shiftedPath}" stroke="${item.color}"></path>${marker}`;
+        }).join('');
+
+        return `<section class="panel ${options.className || ''}">
+          <div class="panel-heading">
+            <h2 class="panel-title">${title}</h2>
+            ${legend(series.map((item) => [item.label, item.color]))}
+          </div>
+          <div class="chart-wrap">
+            <svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${title}">
+              ${grid}${graphs}${xLabels}
+            </svg>
+          </div>
+        </section>`;
+      }
+
+      function renderHostRows(hosts) {
+        const names = Object.keys(hosts);
+        if (!names.length) return '<div class="empty-row">Keine Hosts konfiguriert</div>';
+        return names.map((name) => {
+          const host = hosts[name] || {};
+          const online = Boolean(host.online);
+          return `<div class="host-row">
+            <div class="host-name-wrap">
+              <div class="host-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+              <div class="host-status ${online ? '' : 'offline'}"><span class="dot"></span> ${online ? 'Online' : 'Offline'}</div>
+            </div>
+            ${[['CPU', host.cpu_percent], ['RAM', host.ram_percent], ['Disk', host.storage_percent], ['Temp', host.temperature_c]].map(([label, value]) => `
+              <div class="host-stat"><span>${label}</span>${online ? (label === 'Temp' ? formatTemperature(finite(value)) : formatPercent(finite(value))) : '—'}</div>
+            `).join('')}
+          </div>`;
+        }).join('');
+      }
+
+      function renderHostResources(hosts) {
+        const names = Object.keys(hosts);
+        if (!names.length) return '<div class="empty-row">Keine Host-Daten verfügbar</div>';
+        return names.map((name) => {
+          const host = hosts[name] || {};
+          if (!host.online) return `<div class="resource-row"><div class="resource-host">${escapeHtml(name)}</div><div class="muted">Host offline</div><div class="resource-values">—</div></div>`;
+          const cpu = finite(host.cpu_percent);
+          const ram = finite(host.ram_percent);
+          return `<div class="resource-row">
+            <div class="resource-host" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+            <div class="resource-bars" aria-label="CPU ${formatPercent(cpu)}, RAM ${formatPercent(ram)}">
+              <div class="bar-track"><div class="bar-fill" style="width:${cpu === null ? 0 : Math.max(0, Math.min(cpu, 100))}%"></div></div>
+              <div class="bar-track"><div class="bar-fill ram" style="width:${ram === null ? 0 : Math.max(0, Math.min(ram, 100))}%"></div></div>
+            </div>
+            <div class="resource-values">CPU ${formatPercent(cpu)}<br>RAM ${formatPercent(ram)}</div>
+          </div>`;
+        }).join('');
+      }
+
+      function renderContainers(hosts) {
+        const rows = Object.entries(hosts).flatMap(([hostName, host]) =>
+          (Array.isArray(host?.docker) ? host.docker : []).map((container) => ({ hostName, container }))
+        );
+        if (!rows.length) return '<tr><td class="empty-row" colspan="5">Keine Container gefunden</td></tr>';
+        return rows.map(({ hostName, container }) => {
+          const running = (container.state || container.status || '').toLowerCase().startsWith('running');
+          const state = container.state || container.status || 'Unbekannt';
+          const startedAt = container.started_at && !container.started_at.startsWith('0001-')
+            ? new Date(container.started_at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })
+            : '—';
+          return `<tr>
+            <td>${escapeHtml(container.name)}</td>
+            <td>${escapeHtml(hostName)}</td>
+            <td><span class="status-text ${running ? '' : 'bad'}"><span class="dot"></span> ${escapeHtml(state)}</span></td>
+            <td>${escapeHtml(startedAt)}</td>
+            <td>${escapeHtml(container.restart_count ?? 0)}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      function renderSecurity(hosts) {
+        const entries = Object.entries(hosts);
+        if (!entries.length) return '<div class="empty-row">Keine Sicherheitsdaten verfügbar</div>';
+        return entries.map(([name, host]) => {
+          const ufw = host.ufw || {};
+          const fail2ban = host.fail2ban || {};
+          if (!host.online) {
+            return `<div class="security-host"><div class="security-host-name">${escapeHtml(name)}</div><span class="status-text bad">Host nicht erreichbar</span></div>`;
+          }
+          const ufwStatus = ufw.active ? 'Aktiv' : 'Inaktiv';
+          const failStatus = fail2ban.active ? 'Aktiv' : 'Inaktiv';
+          const ufwDetails = ufw.raw || 'Keine UFW-Ausgabe';
+          const jailDetails = Array.isArray(fail2ban.jails) && fail2ban.jails.length
+            ? fail2ban.jails.map((jail) => `${jail}\n${fail2ban.details?.[jail] || 'Keine Details verfügbar'}`).join('\n\n')
+            : (fail2ban.raw || 'Keine aktiven Jails');
+          return `<div class="security-host">
+            <div class="security-host-name">${escapeHtml(name)}</div>
+            <div class="security-state-row"><span>UFW Firewall</span><span class="status-text ${ufw.active ? '' : 'bad'}">${ufwStatus}</span></div>
+            <div class="security-state-row"><span>Fail2Ban · ${(fail2ban.jails || []).length} Jails</span><span class="status-text ${fail2ban.active ? '' : 'bad'}">${failStatus}</span></div>
+            <details><summary>Firewall-Regeln anzeigen</summary><div class="security-detail">${escapeHtml(ufwDetails)}</div></details>
+            <details><summary>Fail2Ban-Details anzeigen</summary><div class="security-detail">${escapeHtml(jailDetails)}</div></details>
+          </div>`;
+        }).join('');
+      }
+
+      function addHistory(hosts) {
+        const online = Object.values(hosts).filter((host) => host?.online);
+        const sample = {
+          cpu: average(online.map((host) => host.cpu_percent)),
+          ram: average(online.map((host) => host.ram_percent)),
+          disk: average(online.map((host) => host.storage_percent)),
+          temperature: average(online.map((host) => host.temperature_c))
+        };
+        Object.entries(sample).forEach(([key, value]) => {
+          chartHistory[key].push(value);
+          if (chartHistory[key].length > maxHistory) chartHistory[key].shift();
+        });
+        chartHistory.times ||= [];
+        chartHistory.times.push(new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }));
+        if (chartHistory.times.length > maxHistory) chartHistory.times.shift();
+        return sample;
+      }
+
+      function renderDashboard(hosts) {
+        const sample = addHistory(hosts);
+        const names = Object.keys(hosts);
+        const onlineCount = Object.values(hosts).filter((host) => host?.online).length;
+        const dockerCount = Object.values(hosts).reduce((total, host) => total + (Array.isArray(host?.docker) ? host.docker.length : 0), 0);
+        const temps = Object.values(hosts).filter((host) => host?.online).map((host) => finite(host.temperature_c)).filter((value) => value !== null);
+        const tempRange = temps.length ? `${Math.min(...temps).toFixed(1).replace('.', ',')}° – ${Math.max(...temps).toFixed(1).replace('.', ',')}°` : 'Keine Temperaturdaten';
+        const diskFree = Object.values(hosts).filter((host) => host?.online).map((host) => host.storage_free_bytes).filter((value) => finite(value) !== null);
+        const metricCards = [
+          renderMetric('cpu', 'CPU', formatPercent(sample.cpu), 'Ø Auslastung', `${onlineCount} von ${names.length} Hosts online`),
+          renderMetric('ram', 'RAM', formatPercent(sample.ram), 'Ø Auslastung', 'Über alle erreichbaren Hosts'),
+          renderMetric('disk', 'Speicher', formatPercent(sample.disk), 'Ø Belegung', diskFree.length ? `${formatBytes(diskFree.reduce((sum, value) => sum + Number(value), 0))} frei` : 'Root-Dateisystem'),
+          renderMetric('temperature', 'Temperatur', formatTemperature(sample.temperature), 'Ø aller Hosts', tempRange)
+        ].join('');
+        const systemState = document.querySelector('#system-state');
+        systemState.innerHTML = `<span class="dot"></span>${onlineCount === names.length && names.length ? 'Alle Systeme online' : `${onlineCount} von ${names.length} Hosts online`}`;
+        systemState.style.color = onlineCount === names.length && names.length ? 'var(--cyan)' : 'var(--amber)';
+
+        document.querySelector('#app').innerHTML = `
+          <div class="metrics-grid">${metricCards}</div>
+          <section class="panel hosts-panel" id="hosts">
+            <div class="panel-heading"><h2 class="panel-title">Hosts</h2><span class="panel-meta">${onlineCount} online</span></div>
+            ${renderHostRows(hosts)}
+          </section>
+          ${renderChart('Systemressourcen', [
+            { label: 'CPU', color: colors.cpu, values: chartHistory.cpu },
+            { label: 'RAM', color: colors.ram, values: chartHistory.ram },
+            { label: 'Speicher', color: colors.disk, values: chartHistory.disk }
+          ], { className: 'resource-panel' })}
+          ${renderChart('Temperaturverlauf', [
+            { label: 'Temperatur', color: colors.temperature, values: chartHistory.temperature }
+          ], { className: 'temperature-panel', max: 60, ticks: [20, 30, 40, 50, 60], suffix: '°' })}
+          <section class="panel containers-panel" id="containers">
+            <div class="panel-heading">
+              <h2 class="panel-title">Container-Services</h2>
+              <span class="panel-meta">${dockerCount} Container</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Container</th><th>Host</th><th>Status</th><th>Gestartet</th><th>Restarts</th></tr></thead>
+                <tbody>${renderContainers(hosts)}</tbody>
               </table>
             </div>
-          </div>
-
-          <div class="status-row"><span>Fail2Ban</span><span>${fail2ban.active ? '<span class="ok">Aktiv</span>' : '<span class="bad">Inaktiv</span>'}</span></div>
-          <div class="status-row"><span>Jails</span><span>${(fail2ban.jails || []).length}</span></div>
-          ${renderJailCards(fail2ban)}
-
-          <table class="docker-table">
-            <thead><tr><th>Container</th><th>Status</th><th>Start</th><th>Re</th></tr></thead>
-            <tbody>${renderDockerRows(data.docker || [])}</tbody>
-          </table>
-        `;
-      }
-
-      function renderHostCard(name, data) {
-        return `<section class="card host-card" data-host="${escapeHtml(name)}">${renderHostInner(name, data)}</section>`;
-      }
-
-      function syncDashboard(data) {
-        const app = document.getElementById('app');
-        const currentCards = new Map(
-          [...app.querySelectorAll('.host-card')].map((card) => [card.dataset.host, card])
-        );
-        const nextHosts = new Set(Object.keys(data));
-
-        for (const [name, hostData] of Object.entries(data)) {
-          const existing = currentCards.get(name);
-          if (existing) {
-            existing.innerHTML = renderHostInner(name, hostData);
-          } else {
-            app.insertAdjacentHTML('beforeend', renderHostCard(name, hostData));
-          }
-        }
-
-        for (const [name, card] of currentCards.entries()) {
-          if (!nextHosts.has(name)) {
-            card.remove();
-          }
-        }
+          </section>
+          <div class="side-stack">
+            <section class="panel">
+              <div class="panel-heading">
+                <h2 class="panel-title">Host-Ressourcen</h2>
+                ${legend([['CPU', colors.cpu], ['RAM', colors.ram]])}
+              </div>
+              <div class="resource-list">${renderHostResources(hosts)}</div>
+            </section>
+            <section class="panel" id="security">
+              <div class="panel-heading">
+                <h2 class="panel-title">Sicherheitsstatus</h2>
+                <span class="panel-meta">UFW · Fail2Ban</span>
+              </div>
+              <div class="security-content">${renderSecurity(hosts)}</div>
+            </section>
+          </div>`;
       }
 
       async function loadDashboard() {
+        if (loading) return;
+        loading = true;
+        const errorBanner = document.querySelector('#error-banner');
         try {
           const response = await fetch('/api/dashboard');
+          if (!response.ok) throw new Error(`Dashboard-API antwortet mit HTTP ${response.status}`);
           const data = await response.json();
-          syncDashboard(data);
-          document.querySelector('#updated').textContent = 'Aktualisiert: ' + new Date().toLocaleTimeString();
+          if (!data || typeof data !== 'object' || Array.isArray(data)) {
+            throw new Error('Die Dashboard-API hat ein ungültiges Datenformat geliefert');
+          }
+          renderDashboard(data);
+          errorBanner.hidden = true;
+          document.querySelector('#updated').textContent = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         } catch (error) {
-          document.querySelector('#updated').textContent = 'Fehler';
+          errorBanner.textContent = `Dashboard konnte nicht aktualisiert werden: ${error.message || error}`;
+          errorBanner.hidden = false;
+          document.querySelector('#system-state').innerHTML = '<span class="dot"></span>Verbindung gestört';
+          document.querySelector('#system-state').style.color = 'var(--red)';
+        } finally {
+          loading = false;
         }
       }
+
+      document.querySelectorAll('.nav-link').forEach((link) => {
+        link.addEventListener('click', () => {
+          document.querySelectorAll('.nav-link').forEach((item) => item.classList.toggle('active', item === link));
+        });
+      });
 
       loadDashboard();
       setInterval(loadDashboard, 15000);

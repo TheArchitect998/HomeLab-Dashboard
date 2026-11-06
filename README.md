@@ -27,6 +27,14 @@ A lightweight, self-hosted monitoring dashboard for your home lab. Monitor multi
 
 ## Features
 
+**Dashboard preview (v2.0.0):**
+
+![HomeLab Dashboard v2.0.0](screenshots/dashboard-v2.0.0.png)
+
+[Latest release: v2.0.0](https://github.com/TheArchitect998/HomeLab-Dashboard/releases/tag/v2.0.0)
+
+The new overview groups host metrics, resource trends, Docker status, and firewall/Fail2Ban details in one responsive view. Resource history is collected in the browser while the dashboard is open.
+
 ✅ **Real-time Monitoring**
 - CPU, RAM, disk usage, and temperature
 - Multi-device support with auto-refresh (15s)
