@@ -16,6 +16,7 @@ A lightweight, self-hosted monitoring dashboard for your home lab. Monitor multi
   - [Dashboard Setup](#dashboard-setup)
   - [Agent Setup](#agent-setup)
   - [Systemd Services](#systemd-services)
+  - [Updating the Dashboard UI](#updating-the-dashboard-ui)
 - [Configuration](#configuration)
 - [Deployment Options](#deployment-options)
 - [Security](#security)
@@ -321,6 +322,22 @@ Check agent logs:
 ```bash
 sudo journalctl -u homelab-agent.service -f
 ```
+
+### Updating the Dashboard UI
+
+To update only the dashboard interface, replace `frontend/index.html` on the dashboard host. The FastAPI app reads this file when a page is requested, so stopping or restarting the service is not required.
+
+From the application directory (shown here as `/opt/homelab-dashboard`), run:
+
+```bash
+cd /opt/homelab-dashboard
+sudo cp frontend/index.html "frontend/index.html.bak.$(date +%Y%m%d-%H%M%S)"
+curl -fL https://github.com/TheArchitect998/HomeLab-Dashboard/releases/download/v2.0.0/index.html -o /tmp/homelab-dashboard-index.html
+sudo install -m 0644 /tmp/homelab-dashboard-index.html frontend/index.html
+rm /tmp/homelab-dashboard-index.html
+```
+
+Open or refresh the dashboard in your browser. If the old styles are still cached, force-refresh the page (for example, `Ctrl+F5`). For a later release, replace `v2.0.0` in the download URL with the desired release version.
 
 ---
 
