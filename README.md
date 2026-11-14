@@ -32,7 +32,7 @@ A lightweight, self-hosted monitoring dashboard for your home lab. Monitor multi
 
 ![HomeLab Dashboard v2.0.0](screenshots/dashboard-v2.0.0.png)
 
-[Latest release: v2.1.0](https://github.com/TheArchitect998/HomeLab-Dashboard/releases/tag/v2.1.0)
+[Latest release: v2.2.0](https://github.com/TheArchitect998/HomeLab-Dashboard/releases/tag/v2.2.0)
 
 The new overview groups host metrics, resource trends, Docker status, and firewall/Fail2Ban details in one responsive view. Resource history is collected in the browser while the dashboard is open.
 
@@ -40,25 +40,31 @@ The new overview groups host metrics, resource trends, Docker status, and firewa
 - CPU, RAM, disk usage, and temperature
 - Multi-device support with auto-refresh (15s)
 - Switch the interface between German, English, and French; the choice is saved in the browser
+- Dedicated Hosts, Containers and Security views, with containers grouped by host
+- Light/dark mode and adjustable font sizes
 
 ✅ **Security Monitoring**
 - UFW firewall status and active rules
 - Fail2Ban status and jail overview
 - Failed login attempt tracking
+- Password-protected dashboard with local initial setup and password changes
+- Expanded security details in the Security view; expanded sections remain open on refresh
 
 ✅ **Container Management**
 - Docker container status
 - Container restart history
 - Last start timestamp
+- Optional Telegram notifications for SSH sessions, Fail2Ban and Docker events
+- Per-host temperature alerts and a daily Telegram report at 12:00
 
-✅ **Zero Database**
-- Lightweight agents with no persistence required
-- Simple JSON-based communication
+✅ **Lightweight Storage**
+- Agents do not require a database
+- The dashboard stores password and Telegram settings locally and uses SQLite for reporting
 
 ✅ **Easy Deployment**
 - Example systemd service files included
-- Single `.env` configuration file
-- No external dependencies
+- Example `.env` configuration and systemd services
+- Python dependencies installed into a virtual environment
 
 ---
 
@@ -138,16 +144,39 @@ Example `.env`:
 DASHBOARD_HOST=0.0.0.0
 DASHBOARD_PORT=8888
 AGENT_URLS='["http://pi-1.local:9100/api/metrics","http://pi-2.local:9100/api/metrics"]'
+AGENT_KEY=your-long-random-agent-key
+HOMELAB_STATE_DIR=/opt/homelab-dashboard/state
 ```
 
-### 4. Start dashboard
+`AGENT_KEY` must match `HOMELAB_AGENT_KEY` on each agent. Protect `.env` from other users. `AGENT_URLS` accepts the existing `/api/metrics` URLs or agent base URLs; names remain `agent-1`, `agent-2`, and so on.
+
+### 4. Set the first password locally
+
+The state directory must be writable only by the dashboard service user. Replace `user` with your actual service user:
+
+```bash
+sudo install -d -o user -g user -m 0700 /opt/homelab-dashboard/state
+sudo chown user:user .env
+sudo chmod 600 .env
+set -a
+source .env
+set +a
+python dashboard_api.py setup
+```
+
+Set a password of at least 12 characters. For a service installation, run the setup command as the same user as the dashboard, with the same `HOMELAB_STATE_DIR`. The password can later be changed under Settings.
+
+### 5. Start dashboard
 
 ```bash
 source venv/bin/activate
+set -a
+source .env
+set +a
 uvicorn dashboard_api:app --host 0.0.0.0 --port 8888
 ```
 
-Open browser: `http://localhost:8888`
+Open `http://localhost:8888` locally and sign in. Use trusted HTTPS for network access; HTTP exposes credentials and session cookies.
 
 ---
 
@@ -187,12 +216,19 @@ Set your agent URLs (hostnames or IPs):
 DASHBOARD_HOST=0.0.0.0
 DASHBOARD_PORT=8888
 AGENT_URLS='["http://192.168.1.100:9100/api/metrics","http://192.168.1.101:9100/api/metrics"]'
+AGENT_KEY=your-long-random-agent-key
+HOMELAB_STATE_DIR=/opt/homelab-dashboard/state
 ```
+
+Create the state directory and set the initial password as described in [Quick Start](#4-set-the-first-password-locally). Configure the same key on every agent.
 
 #### Step 3: Test locally
 
 ```bash
 source venv/bin/activate
+set -a
+source .env
+set +a
 uvicorn dashboard_api:app --host 0.0.0.0 --port 8888
 ```
 
@@ -255,12 +291,15 @@ _agent ALL=(ALL) NOPASSWD: /usr/bin/fail2ban-client
 
 ```bash
 source venv/bin/activate
+set -a
+source homelab-agent.env
+set +a
 uvicorn backend.agent:app --host 0.0.0.0 --port 9100
 ```
 
 Test the agent:
 ```bash
-curl http://localhost:9100/api/metrics
+curl -H "X-Agent-Key: $HOMELAB_AGENT_KEY" http://localhost:9100/api/metrics
 ```
 
 ---
@@ -283,7 +322,7 @@ sudo nano /etc/systemd/system/homelab-dashboard.service
 Key settings to verify:
 - `User=` (your username)
 - `WorkingDirectory=` (path to cloned repo)
-- `EnvironmentFile=` (path to .env)
+- `EnvironmentFile=` (absolute path to the protected `.env`)
 
 Enable and start:
 ```bash
@@ -324,6 +363,10 @@ Check agent logs:
 sudo journalctl -u homelab-agent.service -f
 ```
 
+### Updating to v2.2.0
+
+Update `dashboard_api.py`, `frontend/index.html`, and `backend/agent.py` on each relevant host together, and restart both services. Updating the UI alone from v2.1.0 is not sufficient: v2.2.0 requires the new authentication and monitoring API. Preserve your existing `.env`, add `AGENT_KEY` and `HOMELAB_STATE_DIR`, create the writable state directory, and run `python dashboard_api.py setup` once as the dashboard service user before starting the updated service. Keep your existing `AGENT_URLS`; no migration of their format is required.
+
 ### Updating the Dashboard UI
 
 To update only the dashboard interface, replace `frontend/index.html` on the dashboard host. The FastAPI app reads this file when a page is requested, so stopping or restarting the service is not required.
@@ -333,12 +376,12 @@ From the application directory (shown here as `/opt/homelab-dashboard`), run:
 ```bash
 cd /opt/homelab-dashboard
 sudo cp frontend/index.html "frontend/index.html.bak.$(date +%Y%m%d-%H%M%S)"
-curl -fL https://github.com/TheArchitect998/HomeLab-Dashboard/releases/download/v2.0.0/index.html -o /tmp/homelab-dashboard-index.html
+curl -fL https://github.com/TheArchitect998/HomeLab-Dashboard/releases/download/v2.2.0/index.html -o /tmp/homelab-dashboard-index.html
 sudo install -m 0644 /tmp/homelab-dashboard-index.html frontend/index.html
 rm /tmp/homelab-dashboard-index.html
 ```
 
-Open or refresh the dashboard in your browser. If the old styles are still cached, force-refresh the page (for example, `Ctrl+F5`). For a later release, replace `v2.0.0` in the download URL with the desired release version.
+Open or refresh the dashboard in your browser. If the old styles are still cached, force-refresh the page (for example, `Ctrl+F5`). Use this UI-only procedure only when the installed backend is already compatible with that release.
 
 ---
 
@@ -358,12 +401,21 @@ Then restart the dashboard:
 sudo systemctl restart homelab-dashboard.service
 ```
 
+### Telegram and temperature monitoring
+
+1. Create a Telegram bot, send it a message, and obtain its bot token and the destination chat ID. The bot ID is not the chat ID.
+2. In **Settings → Telegram notifications**, enter the token and chat ID, select event types and enable Telegram. Save these settings before enabling temperature monitoring or the daily report below. Leaving the token field empty retains the saved token.
+3. Configure the per-host temperature thresholds (default 45 °C), alerts and the daily report in the same section. Save this subsection separately. A warning is sent when the threshold is exceeded, reminders follow every five minutes while it remains high, and a recovery message is sent when it returns to or below the threshold.
+4. SSH and Fail2Ban notifications and SSH counts need readable system journal entries. Grant the agent user journal access (for example via the `systemd-journal` group) and restart the agent; this grants access to potentially sensitive logs. SSH uses PAM session-open/session-close entries and, where available, a matching SSH acceptance entry for the remote IP. Fail2Ban must log ban/unban messages to the journal.
+5. Docker events require Docker CLI access for the agent user. Docker group membership grants privileged access. Run an up-to-date agent on every monitored machine, including the dashboard host if it should also be monitored.
+
+The report is sent once per host after 12:00 in the dashboard host's timezone. It covers the last 24 hours of temperature samples and SSH/Docker events, including event types whose individual Telegram notifications are disabled. Data collection starts when the report is enabled; old script logs are not imported, and incomplete coverage is marked. Docker and journal retention, outages and delayed polling can limit the results. After a delayed startup or a send failure, the report is retried when possible.
+
+Settings, the password hash, the bot token and the reporting SQLite database are stored under `HOMELAB_STATE_DIR`; protect this directory and its backups. The SQLite database retains approximately 25 hours of samples and events. Run one dashboard worker only. Disable older Telegram scripts after verifying the new notifications to avoid duplicates.
+
 ### Changing Ports
 
-**Dashboard port:**
-```env
-DASHBOARD_PORT=8888  # Default: 8888
-```
+**Dashboard port:** Change `--port 8888` in the dashboard startup command and systemd service. `DASHBOARD_PORT` in `.env` is informational; Uvicorn uses its command-line port.
 
 **Agent port:**
 Update the agent startup command in the systemd service file:
@@ -434,6 +486,8 @@ No code changes needed—just restart the dashboard.
 - ✅ **Use TLS/reverse proxy** if exposing dashboard externally
 - ✅ **Restrict sudoers** to only UFW and Fail2Ban commands
 - ✅ **Firewall rules** to limit dashboard/agent access
+- ✅ **Keep the state directory private**: it contains the password hash, Telegram token and monitoring data
+- ✅ **Use HTTPS for network access**, not only internet access; plain HTTP exposes login credentials and cookies
 
 **Example: Firewall rules to restrict agent access**
 
@@ -460,7 +514,7 @@ sudo ufw deny 9100
 
 2. Agent port is accessible:
    ```bash
-   curl http://agent-hostname:9100/api/metrics
+   curl -H "X-Agent-Key: YOUR_AGENT_KEY" http://agent-hostname:9100/api/metrics
    ```
 
 3. Hostnames resolve:
@@ -470,6 +524,16 @@ sudo ufw deny 9100
    ```
 
 4. Dashboard has correct URLs in `.env`
+
+---
+
+### HTTPS via Nginx Proxy Manager
+
+If the browser says the server cannot be found, first check DNS with `nslookup YOUR-SUBDOMAIN` on the client. The name must resolve to the proxy host's reachable IP, not the dashboard port. For LAN-only use, configure the local DNS server to resolve the name to the proxy's LAN IP. Check DNS caches and that the client uses that DNS server.
+
+In Nginx Proxy Manager, forward using scheme `http`, the dashboard host's reachable IP and port `8888`, and select a trusted certificate for the subdomain. Verify port 443 is reachable and test `curl http://DASHBOARD-IP:8888/` from the proxy host. Within a container, `127.0.0.1` normally refers to the container, not the dashboard host.
+
+For TLS terminated on another host, configure Uvicorn with `--proxy-headers --forwarded-allow-ips PROXY-IP` using the actual trusted proxy source IP, so HTTPS cookies are marked `Secure`. Do not trust all forwarded-header sources. Restrict direct dashboard access with a firewall and restart the service after changing its systemd configuration.
 
 ---
 
@@ -579,7 +643,8 @@ HomeLab-Dashboard/
 ├── frontend/
 │   └── index.html                       # Web UI (HTML + inline CSS/JS)
 ├── backend/
-│   └── agent.py                         # Lightweight metrics agent
+│   ├── agent.py                         # Lightweight metrics agent
+│   └── test_dashboard.py                # Focused backend tests
 │
 └── systemd/
     ├── homelab-dashboard.service.example  # Dashboard systemd service template

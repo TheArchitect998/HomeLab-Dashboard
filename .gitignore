@@ -7,6 +7,7 @@
 
 venv/
 .venv/
+state/
 __pycache__/
 *.pyc
 *.pyo

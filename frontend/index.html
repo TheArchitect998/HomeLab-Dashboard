@@ -36,7 +36,7 @@
           radial-gradient(ellipse at 68% -20%, rgba(19, 77, 123, 0.18), transparent 50%),
           var(--bg);
         color: var(--text);
-        font: 13px/1.45 Inter, "Segoe UI", system-ui, sans-serif;
+        font: calc(13px * var(--font-scale, 1.2))/1.45 Inter, "Segoe UI", system-ui, sans-serif;
       }
 
       button, a { font: inherit; }
@@ -71,7 +71,7 @@
       }
 
       .brand-title {
-        font-size: 14px;
+        font-size: calc(14px * var(--font-scale, 1.2));
         font-weight: 700;
         line-height: 1.15;
       }
@@ -79,7 +79,7 @@
       .brand-subtitle {
         margin-top: 2px;
         color: var(--muted);
-        font-size: 10px;
+        font-size: calc(10px * var(--font-scale, 1.2));
       }
 
       .topbar-meta {
@@ -87,7 +87,7 @@
         align-items: center;
         gap: 14px;
         color: var(--muted);
-        font-size: 10px;
+        font-size: calc(10px * var(--font-scale, 1.2));
         white-space: nowrap;
       }
 
@@ -110,7 +110,7 @@
         border-radius: 5px;
         background: var(--surface);
         color: var(--text);
-        font-size: 10px;
+        font-size: calc(10px * var(--font-scale, 1.2));
         cursor: pointer;
       }
 
@@ -164,7 +164,7 @@
         padding: 0 10px;
         border-radius: 6px;
         color: #8ca6c4;
-        font-size: 11px;
+        font-size: calc(11px * var(--font-scale, 1.2));
         transition: background 120ms ease, color 120ms ease;
       }
 
@@ -182,13 +182,13 @@
       .sidebar-note {
         margin: auto 8px 4px;
         color: #627b99;
-        font-size: 10px;
+        font-size: calc(10px * var(--font-scale, 1.2));
       }
 
       .page-footer {
         padding: 14px 2px 0;
         color: #627b99;
-        font-size: 10px;
+        font-size: calc(10px * var(--font-scale, 1.2));
         text-align: right;
       }
 
@@ -264,13 +264,13 @@
 
       .metric-label {
         color: #a9bfdc;
-        font-size: 11px;
+        font-size: calc(11px * var(--font-scale, 1.2));
         font-weight: 650;
       }
 
       .metric-value {
         margin: 2px 0 0 42px;
-        font-size: 21px;
+        font-size: calc(21px * var(--font-scale, 1.2));
         font-weight: 700;
         letter-spacing: -0.035em;
         line-height: 1.1;
@@ -279,7 +279,7 @@
       .metric-caption {
         margin: 3px 0 0 42px;
         color: var(--muted);
-        font-size: 10px;
+        font-size: calc(10px * var(--font-scale, 1.2));
       }
 
       .sparkline {
@@ -292,7 +292,7 @@
 
       .metric-foot {
         color: #829bb8;
-        font-size: 9px;
+        font-size: calc(9px * var(--font-scale, 1.2));
       }
 
       .panel { scroll-margin-top: 62px; }
@@ -309,13 +309,13 @@
 
       .panel-title {
         margin: 0;
-        font-size: 11px;
+        font-size: calc(11px * var(--font-scale, 1.2));
         font-weight: 650;
       }
 
       .panel-meta {
         color: var(--muted);
-        font-size: 9px;
+        font-size: calc(9px * var(--font-scale, 1.2));
       }
 
       .hosts-panel { grid-column: span 3; }
@@ -323,6 +323,7 @@
       .temperature-panel { grid-column: span 5; }
       .containers-panel { grid-column: span 7; }
       .side-stack { display: grid; grid-column: span 5; gap: 12px; }
+      .side-panel { grid-column: span 5; }
 
       .host-row {
         display: grid;
@@ -339,7 +340,7 @@
       .host-name-wrap { min-width: 0; }
       .host-name {
         overflow: hidden;
-        font-size: 10px;
+        font-size: calc(10px * var(--font-scale, 1.2));
         font-weight: 600;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -348,7 +349,7 @@
       .host-status {
         margin-top: 3px;
         color: var(--green);
-        font-size: 9px;
+        font-size: calc(9px * var(--font-scale, 1.2));
       }
 
       .host-status.offline { color: var(--red); }
@@ -356,20 +357,20 @@
       .host-stat {
         text-align: right;
         color: #c3d4e9;
-        font-size: 9px;
+        font-size: calc(9px * var(--font-scale, 1.2));
       }
 
       .host-stat span {
         display: block;
         margin-bottom: 2px;
         color: var(--muted);
-        font-size: 8px;
+        font-size: calc(8px * var(--font-scale, 1.2));
       }
 
       .chart-wrap { padding: 7px 10px 8px; }
       .chart-svg { display: block; width: 100%; height: 178px; }
       .chart-grid { stroke: #1b3550; stroke-width: 1; }
-      .chart-label { fill: #8199b5; font: 9px "Segoe UI", sans-serif; }
+      .chart-label { fill: #8199b5; font: calc(9px * var(--font-scale, 1.2)) "Segoe UI", sans-serif; }
       .chart-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
       .chart-area { opacity: 0.11; }
 
@@ -378,7 +379,7 @@
         align-items: center;
         gap: 11px;
         color: var(--muted);
-        font-size: 9px;
+        font-size: calc(9px * var(--font-scale, 1.2));
         white-space: nowrap;
       }
 
@@ -391,13 +392,13 @@
         padding: 7px 9px;
         border-bottom: 1px solid rgba(26, 53, 81, 0.75);
         text-align: left;
-        font-size: 10px;
+        font-size: calc(10px * var(--font-scale, 1.2));
         white-space: nowrap;
       }
 
       th {
         color: #91a9c5;
-        font-size: 9px;
+        font-size: calc(9px * var(--font-scale, 1.2));
         font-weight: 550;
       }
 
@@ -420,7 +421,7 @@
 
       .resource-host {
         overflow: hidden;
-        font-size: 10px;
+        font-size: calc(10px * var(--font-scale, 1.2));
         text-overflow: ellipsis;
         white-space: nowrap;
       }
@@ -429,7 +430,7 @@
       .bar-track { height: 6px; overflow: hidden; border-radius: 8px; background: #19304a; }
       .bar-fill { height: 100%; border-radius: inherit; background: var(--blue); }
       .bar-fill.ram { background: var(--cyan); }
-      .resource-values { color: #b7c9df; font-size: 9px; text-align: right; line-height: 1.5; }
+      .resource-values { color: #b7c9df; font-size: calc(9px * var(--font-scale, 1.2)); text-align: right; line-height: 1.5; }
 
       .security-content { padding: 7px 11px 10px; }
       .security-host {
@@ -438,18 +439,16 @@
       }
 
       .security-host:last-child { border-bottom: 0; }
-      .security-host-name { margin-bottom: 5px; font-size: 10px; font-weight: 650; }
-      .security-state-row { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 9px; }
+      .security-host-name { margin-bottom: 5px; font-size: calc(10px * var(--font-scale, 1.2)); font-weight: 650; }
+      .security-state-row { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: calc(9px * var(--font-scale, 1.2)); }
       .security-state-row + .security-state-row { margin-top: 4px; }
 
-      details { margin-top: 6px; color: #91a9c5; font-size: 9px; }
+      details { margin-top: 6px; color: #91a9c5; font-size: calc(9px * var(--font-scale, 1.2)); }
       summary { cursor: pointer; }
       .security-detail {
-        max-height: 110px;
         margin-top: 5px;
-        overflow: auto;
         color: #afc2d9;
-        font: 9px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+        font: calc(9px * var(--font-scale, 1.2))/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
       }
@@ -462,7 +461,7 @@
         .hosts-panel { grid-column: span 12; }
         .hosts-panel .host-row { grid-template-columns: minmax(130px, 1fr) repeat(4, minmax(45px, auto)); }
         .resource-panel, .temperature-panel { grid-column: span 6; }
-        .containers-panel, .side-stack { grid-column: span 6; }
+        .containers-panel, .side-stack, .side-panel { grid-column: span 6; }
       }
 
       @media (max-width: 720px) {
@@ -487,7 +486,7 @@
         .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
         .metric-card { min-height: 140px; padding: 11px 9px 8px; }
         .dashboard-grid { gap: 9px; }
-        .resource-panel, .temperature-panel, .containers-panel, .side-stack { grid-column: span 12; }
+        .resource-panel, .temperature-panel, .containers-panel, .side-stack, .side-panel { grid-column: span 12; }
         .chart-svg { height: 165px; }
         .topbar-meta { gap: 8px; }
         .topbar-meta .updated-label { display: none; }
@@ -496,7 +495,7 @@
       @media (max-width: 420px) {
         .brand-subtitle { display: none; }
         .topbar { gap: 8px; padding-right: 10px; padding-left: 10px; }
-        .topbar-meta { gap: 6px; font-size: 9px; }
+        .topbar-meta { gap: 6px; font-size: calc(9px * var(--font-scale, 1.2)); }
         .topbar-meta > span[aria-hidden="true"] { display: none; }
         .language-select { max-width: 68px; padding-right: 3px; padding-left: 3px; }
         .system-state { max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
@@ -507,10 +506,82 @@
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
       }
+      :root[data-theme="light"] {
+        color-scheme: light;
+        --bg: #edf3fa; --surface: #fff; --surface-raised: #f5f8fc;
+        --surface-hover: #e4eef9; --border: #bdcfe1; --text: #152b42;
+        --muted: #465f78; --blue: #0069b8; --cyan: #007f78;
+        --green: #007b64; --red: #bd2735; --amber: #8d5b00;
+      }
+      :root[data-theme="light"] .topbar,
+      :root[data-theme="light"] .sidebar { background: var(--surface); border-color: var(--border); }
+      :root[data-theme="light"] .panel,
+      :root[data-theme="light"] .metric-card { background: var(--surface); }
+      :root[data-theme="light"] .nav-link { color: var(--muted); }
+      :root[data-theme="light"] .nav-link.active,
+      :root[data-theme="light"] .nav-link:hover { background: var(--surface-hover); color: var(--blue); }
+      :root[data-theme="light"] .host-stat,
+      :root[data-theme="light"] .metric-label,
+      :root[data-theme="light"] .metric-foot,
+      :root[data-theme="light"] .resource-values,
+      :root[data-theme="light"] .security-detail,
+      :root[data-theme="light"] details,
+      :root[data-theme="light"] th,
+      :root[data-theme="light"] .page-footer,
+      :root[data-theme="light"] .page-footer a { color: var(--text); }
+      :root[data-theme="light"] .chart-label { fill: var(--text); }
+      :root[data-theme="light"] .chart-grid { stroke: var(--border); }
+      :root[data-size="small"] { --font-scale: 1; }
+      :root[data-size="medium"] { --font-scale: 1.2; }
+      :root[data-size="large"] { --font-scale: 1.45; }
+      #app[data-current="hosts"] > :not([data-section="hosts"]),
+      #app[data-current="containers"] > :not([data-section="containers"]),
+      #app[data-current="security"] > :not([data-section="security"]) { display: none; }
+      #app:not([data-current="overview"]) > [data-section] { grid-column: 1 / -1; }
+      .settings-grid { display: grid; gap: 12px; }
+      .form-panel { padding: 16px; }
+      .form-panel h2 { margin: 0 0 12px; font-size: calc(15px * var(--font-scale, 1.2)); }
+      .form-panel h3 { margin: 20px 0 12px; font-size: calc(13px * var(--font-scale, 1.2)); }
+      .form-panel form, .form-fields { display: grid; gap: 10px; }
+      .form-panel label { display: grid; gap: 4px; }
+      .form-panel input:not([type="checkbox"]), .form-panel select {
+        width: 100%; max-width: 420px; min-height: 36px; padding: 7px;
+        border: 1px solid var(--border); border-radius: 5px;
+        background: var(--surface-raised); color: var(--text); font: inherit;
+      }
+      .form-panel .check { display: flex; align-items: center; gap: 8px; }
+      .form-panel button {
+        width: fit-content; min-height: 36px; padding: 7px 14px; cursor: pointer;
+        background: var(--blue); color: #fff; border: 0; border-radius: 5px;
+      }
+      .form-message { color: var(--red); }
+      .login-screen { max-width: 460px; margin: 10vh auto; padding: 16px; }
+      [hidden] { display: none !important; }
+      @media (max-width: 720px) {
+        .brand-subtitle, .topbar-meta, .language-select, .nav-link, .page-footer,
+        .metric-label, .metric-caption, .metric-foot, .panel-title, .panel-meta,
+        .host-name, .host-status, .host-stat, .host-stat span, .legend,
+        th, td, .resource-host, .resource-values, .security-host-name,
+        .security-state-row, details, .security-detail { font-size: calc(11px * var(--font-scale, 1.2)); }
+        .chart-label { font-size: calc(11px * var(--font-scale, 1.2)); }
+      }
+      @media (max-width: 420px) {
+        .topbar-meta .system-state, .topbar-meta time { display: none; }
+      }
     </style>
   </head>
   <body>
-    <header class="topbar">
+    <section id="login-screen" class="login-screen" hidden>
+      <div class="panel form-panel">
+        <h1>Homelab Monitor</h1>
+        <form id="login-form">
+          <label><span data-i18n="password">Passwort</span><input name="password" type="password" autocomplete="current-password" required /></label>
+          <button type="submit" data-i18n="login">Anmelden</button>
+          <p id="login-message" class="form-message" role="status"></p>
+        </form>
+      </div>
+    </section>
+    <header class="topbar" id="dashboard-header" hidden>
       <a class="brand" href="#overview" aria-label="Homelab Monitor Übersicht" data-i18n-aria-label="brandAria">
         <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="m12 2 9 4.5-9 4.5-9-4.5L12 2Z" />
@@ -534,7 +605,7 @@
       </div>
     </header>
 
-    <div class="layout">
+    <div class="layout" id="dashboard-layout" hidden>
       <nav class="sidebar" aria-label="Hauptnavigation" data-i18n-aria-label="mainNavigation">
         <a class="nav-link active" href="#overview">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9Z" /></svg>
@@ -552,6 +623,7 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" /><path d="m9 12 2 2 4-4" /></svg>
           <span data-i18n="security">Sicherheit</span>
         </a>
+        <a class="nav-link" href="#settings"><span data-i18n="settings">Einstellungen</span></a>
         <span class="sidebar-note" data-i18n="pollInterval">Abfrage alle 15 Sekunden</span>
       </nav>
 
@@ -561,6 +633,48 @@
           <section class="panel" style="grid-column: 1 / -1; padding: 18px; color: var(--muted)">
             <span data-i18n="dashboardLoading">Dashboard wird geladen …</span>
           </section>
+        </div>
+        <div id="settings-page" class="settings-grid" hidden>
+          <section class="panel form-panel">
+            <h2 data-i18n="appearance">Darstellung</h2>
+            <div class="form-fields">
+              <label><span data-i18n="fontSize">Schriftgröße</span><select id="font-size"><option value="small" data-i18n="small">Klein</option><option value="medium" data-i18n="medium">Mittel</option><option value="large" data-i18n="large">Groß</option></select></label>
+              <label><span data-i18n="theme">Design</span><select id="theme"><option value="dark" data-i18n="dark">Dunkel</option><option value="light" data-i18n="light">Hell</option></select></label>
+            </div>
+          </section>
+          <section class="panel form-panel">
+            <h2 data-i18n="telegram">Telegram-Mitteilungen</h2>
+            <form id="telegram-form">
+              <label class="check"><input name="enabled" type="checkbox" /><span data-i18n="telegramEnabled">Telegram aktivieren</span></label>
+              <label><span data-i18n="chatId">Chat-ID</span><input name="chat_id" autocomplete="off" /></label>
+              <label><span data-i18n="botToken">Bot-Token (leer lassen, um das gespeicherte Token beizubehalten)</span><input name="token" type="password" autocomplete="off" /></label>
+              <span data-i18n="notifyEvents">Benachrichtigen bei</span>
+              <label class="check"><input name="events" type="checkbox" value="ssh_login" /><span data-i18n="sshLogin">SSH-Anmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="ssh_logout" /><span data-i18n="sshLogout">SSH-Abmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="fail2ban" /><span data-i18n="fail2banEvents">Fail2Ban Ban/Unban</span></label>
+              <label class="check"><input name="events" type="checkbox" value="docker" /><span data-i18n="dockerEvents">Docker Start/Stopp</span></label>
+              <button type="submit" data-i18n="save">Speichern</button>
+              <p id="telegram-message" role="status"></p>
+            </form>
+            <h3 data-i18n="monitoringTitle">Temperatur und Tagesbericht</h3>
+            <form id="monitoring-form">
+              <label class="check"><input name="temperature_enabled" type="checkbox" /><span data-i18n="temperatureAlerts">Temperaturwarnungen aktivieren (alle 5 Minuten)</span></label>
+              <label class="check"><input name="daily_report" type="checkbox" /><span data-i18n="dailyReport">Tagesbericht um 12:00 Uhr aktivieren</span></label>
+              <div id="thresholds" class="form-fields"></div>
+              <button type="submit" data-i18n="save">Speichern</button>
+              <p id="monitoring-message" role="status"></p>
+            </form>
+          </section>
+          <section class="panel form-panel">
+            <h2 data-i18n="changePassword">Passwort ändern</h2>
+            <form id="password-form">
+              <label><span data-i18n="currentPassword">Aktuelles Passwort</span><input name="current_password" type="password" autocomplete="current-password" required /></label>
+              <label><span data-i18n="newPassword">Neues Passwort (mindestens 12 Zeichen)</span><input name="new_password" type="password" minlength="12" maxlength="1024" autocomplete="new-password" required /></label>
+              <button type="submit" data-i18n="changePassword">Passwort ändern</button>
+              <p id="password-message" role="status"></p>
+            </form>
+          </section>
+          <section class="panel form-panel"><button id="logout" type="button" data-i18n="logout">Abmelden</button></section>
         </div>
         <footer class="page-footer"><span data-i18n="author">Autor</span>: <a href="https://github.com/TheArchitect998" target="_blank" rel="noopener noreferrer">TheArchitect998</a></footer>
       </main>
@@ -788,6 +902,49 @@
           invalidData: 'L’API du tableau de bord a renvoyé un format de données invalide'
         }
       };
+
+      Object.assign(translations.de, {
+        settings: 'Einstellungen', appearance: 'Darstellung', fontSize: 'Schriftgröße',
+        small: 'Klein', medium: 'Mittel', large: 'Groß', theme: 'Design', dark: 'Dunkel', light: 'Hell',
+        telegram: 'Telegram-Mitteilungen', telegramEnabled: 'Telegram aktivieren', chatId: 'Chat-ID',
+        botToken: 'Bot-Token (leer lassen, um das gespeicherte Token beizubehalten)',
+        notifyEvents: 'Benachrichtigen bei', sshLogin: 'SSH-Anmeldung', sshLogout: 'SSH-Abmeldung',
+        fail2banEvents: 'Fail2Ban Ban/Unban', dockerEvents: 'Docker Start/Stopp', save: 'Speichern',
+        password: 'Passwort', login: 'Anmelden', logout: 'Abmelden', changePassword: 'Passwort ändern',
+        currentPassword: 'Aktuelles Passwort', newPassword: 'Neues Passwort (mindestens 12 Zeichen)',
+        setupRequired: 'Das Passwort muss zuerst lokal auf dem Dashboard-Host eingerichtet werden.',
+        saved: 'Gespeichert.', requestFailed: 'Anfrage fehlgeschlagen: {error}', passwordChanged: 'Passwort geändert. Bitte erneut anmelden.',
+        monitoringTitle: 'Temperatur und Tagesbericht', temperatureAlerts: 'Temperaturwarnungen aktivieren (alle 5 Minuten)',
+        dailyReport: 'Tagesbericht um 12:00 Uhr aktivieren', threshold: 'Temperaturschwelle (°C)'
+      });
+      Object.assign(translations.en, {
+        settings: 'Settings', appearance: 'Appearance', fontSize: 'Font size',
+        small: 'Small', medium: 'Medium', large: 'Large', theme: 'Theme', dark: 'Dark', light: 'Light',
+        telegram: 'Telegram notifications', telegramEnabled: 'Enable Telegram', chatId: 'Chat ID',
+        botToken: 'Bot token (leave empty to keep the saved token)', notifyEvents: 'Notify about',
+        sshLogin: 'SSH login', sshLogout: 'SSH logout', fail2banEvents: 'Fail2Ban ban/unban',
+        dockerEvents: 'Docker start/stop', save: 'Save', password: 'Password', login: 'Log in',
+        logout: 'Log out', changePassword: 'Change password', currentPassword: 'Current password',
+        newPassword: 'New password (at least 12 characters)',
+        setupRequired: 'Set the password locally on the dashboard host first.',
+        saved: 'Saved.', requestFailed: 'Request failed: {error}', passwordChanged: 'Password changed. Please log in again.',
+        monitoringTitle: 'Temperature and daily report', temperatureAlerts: 'Enable temperature alerts (every 5 minutes)',
+        dailyReport: 'Enable daily report at 12:00', threshold: 'Temperature threshold (°C)'
+      });
+      Object.assign(translations.fr, {
+        settings: 'Paramètres', appearance: 'Apparence', fontSize: 'Taille du texte',
+        small: 'Petite', medium: 'Moyenne', large: 'Grande', theme: 'Thème', dark: 'Sombre', light: 'Clair',
+        telegram: 'Notifications Telegram', telegramEnabled: 'Activer Telegram', chatId: 'ID du chat',
+        botToken: 'Jeton du bot (laisser vide pour conserver le jeton enregistré)', notifyEvents: 'Notifier pour',
+        sshLogin: 'Connexion SSH', sshLogout: 'Déconnexion SSH', fail2banEvents: 'Bannissement/débannissement Fail2Ban',
+        dockerEvents: 'Démarrage/arrêt Docker', save: 'Enregistrer', password: 'Mot de passe', login: 'Connexion',
+        logout: 'Déconnexion', changePassword: 'Changer le mot de passe', currentPassword: 'Mot de passe actuel',
+        newPassword: 'Nouveau mot de passe (12 caractères minimum)',
+        setupRequired: 'Définissez d’abord le mot de passe localement sur l’hôte du tableau de bord.',
+        saved: 'Enregistré.', requestFailed: 'Échec de la requête : {error}', passwordChanged: 'Mot de passe modifié. Reconnectez-vous.',
+        monitoringTitle: 'Température et rapport quotidien', temperatureAlerts: 'Activer les alertes de température (toutes les 5 minutes)',
+        dailyReport: 'Activer le rapport quotidien à 12 h', threshold: 'Seuil de température (°C)'
+      });
 
       const languageLocales = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR' };
       const savedLanguage = localStorage.getItem('homelab-dashboard-language');
@@ -1047,12 +1204,12 @@
           const jailDetails = Array.isArray(fail2ban.jails) && fail2ban.jails.length
             ? fail2ban.jails.map((jail) => `${jail}\n${fail2ban.details?.[jail] || t('noDetailsAvailable')}`).join('\n\n')
             : (fail2ban.raw || t('noActiveJails'));
-          return `<div class="security-host">
+          return `<div class="security-host" data-host="${escapeHtml(name)}">
             <div class="security-host-name">${escapeHtml(name)}</div>
             <div class="security-state-row"><span>${t('ufwFirewall')}</span><span class="status-text ${ufw.active ? '' : 'bad'}">${ufwStatus}</span></div>
             <div class="security-state-row"><span>${t('fail2banJails', { count: (fail2ban.jails || []).length })}</span><span class="status-text ${fail2ban.active ? '' : 'bad'}">${failStatus}</span></div>
-            <details><summary>${t('firewallRules')}</summary><div class="security-detail">${escapeHtml(ufwDetails)}</div></details>
-            <details><summary>${t('fail2banDetails')}</summary><div class="security-detail">${escapeHtml(jailDetails)}</div></details>
+            <details data-detail="ufw"><summary>${t('firewallRules')}</summary><div class="security-detail">${escapeHtml(ufwDetails)}</div></details>
+            <details data-detail="fail2ban"><summary>${t('fail2banDetails')}</summary><div class="security-detail">${escapeHtml(jailDetails)}</div></details>
           </div>`;
         }).join('');
       }
@@ -1076,11 +1233,12 @@
       }
 
       function renderDashboard(hosts, sample = addHistory(hosts)) {
+        const detailStates = new Map([...document.querySelectorAll('#security details')].map((detail) =>
+          [JSON.stringify([detail.closest('[data-host]').dataset.host, detail.dataset.detail]), detail.open]));
         latestDashboard = hosts;
         latestSample = sample;
         const names = Object.keys(hosts);
         const onlineCount = Object.values(hosts).filter((host) => host?.online).length;
-        const dockerCount = Object.values(hosts).reduce((total, host) => total + (Array.isArray(host?.docker) ? host.docker.length : 0), 0);
         const temps = Object.values(hosts).filter((host) => host?.online).map((host) => finite(host.temperature_c)).filter((value) => value !== null);
         const numberFormat = new Intl.NumberFormat(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
         const tempRange = temps.length ? `${numberFormat.format(Math.min(...temps))}° – ${numberFormat.format(Math.max(...temps))}°` : t('noTemperatureData');
@@ -1097,7 +1255,7 @@
 
         document.querySelector('#app').innerHTML = `
           <div class="metrics-grid">${metricCards}</div>
-          <section class="panel hosts-panel" id="hosts">
+          <section class="panel hosts-panel" id="hosts" data-section="hosts">
             <div class="panel-heading"><h2 class="panel-title">${t('hosts')}</h2><span class="panel-meta">${t('hostsOnline', { count: onlineCount })}</span></div>
             ${renderHostRows(hosts)}
           </section>
@@ -1109,34 +1267,38 @@
           ${renderChart(t('temperatureTrend'), [
             { label: t('temperature'), color: colors.temperature, values: chartHistory.temperature }
           ], { className: 'temperature-panel', max: 60, ticks: [20, 30, 40, 50, 60], suffix: '°' })}
-          <section class="panel containers-panel" id="containers">
+          ${Object.entries(hosts).map(([name, host]) => `<section class="panel containers-panel" data-section="containers">
             <div class="panel-heading">
-              <h2 class="panel-title">${t('containerServices')}</h2>
-              <span class="panel-meta">${t(dockerCount === 1 ? 'containerCountSingular' : 'containerCountPlural', { count: dockerCount })}</span>
+              <h2 class="panel-title">${t('containerServices')} · ${escapeHtml(name)}</h2>
+              <span class="panel-meta">${host.online ? t('online') : t('offline')}</span>
             </div>
             <div class="table-wrap">
               <table>
                 <thead><tr><th>${t('containers')}</th><th>${t('host')}</th><th>${t('status')}</th><th>${t('started')}</th><th>${t('restarts')}</th></tr></thead>
-                <tbody>${renderContainers(hosts)}</tbody>
+                <tbody>${host.online ? renderContainers({ [name]: host }) : `<tr><td class="empty-row" colspan="5">${t('hostUnreachable')}</td></tr>`}</tbody>
               </table>
             </div>
-          </section>
-          <div class="side-stack">
-            <section class="panel">
+          </section>`).join('')}
+            <section class="panel side-panel">
               <div class="panel-heading">
                 <h2 class="panel-title">${t('hostResources')}</h2>
                 ${legend([[t('cpu'), colors.cpu], [t('ram'), colors.ram]])}
               </div>
               <div class="resource-list">${renderHostResources(hosts)}</div>
             </section>
-            <section class="panel" id="security">
+            <section class="panel side-panel" id="security" data-section="security">
               <div class="panel-heading">
                 <h2 class="panel-title">${t('securityStatus')}</h2>
                 <span class="panel-meta">UFW · Fail2Ban</span>
               </div>
               <div class="security-content">${renderSecurity(hosts)}</div>
-            </section>
-          </div>`;
+            </section>`;
+        document.querySelectorAll('#security details').forEach((detail) => {
+          const key = JSON.stringify([detail.closest('[data-host]').dataset.host, detail.dataset.detail]);
+          const saved = sessionStorage.getItem(`homelab-security:${location.hash || '#overview'}:${key}`);
+          detail.open = detailStates.has(key) ? detailStates.get(key) : saved === null ? location.hash === '#security' : saved === 'true';
+        });
+        applyView();
       }
 
       async function loadDashboard() {
@@ -1145,6 +1307,7 @@
         const errorBanner = document.querySelector('#error-banner');
         try {
           const response = await fetch('/api/dashboard');
+          if (response.status === 401) { showLogin(); return; }
           if (!response.ok) throw new Error(t('apiHttpError', { status: response.status }));
           const data = await response.json();
           if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -1166,16 +1329,199 @@
         }
       }
 
-      document.querySelectorAll('.nav-link').forEach((link) => {
-        link.addEventListener('click', () => {
-          document.querySelectorAll('.nav-link').forEach((item) => item.classList.toggle('active', item === link));
+      let authenticated = false;
+      function showLogin(message = '') {
+        authenticated = false;
+        latestDashboard = null;
+        latestSample = null;
+        latestError = null;
+        Object.values(chartHistory).forEach((history) => { history.length = 0; });
+        document.querySelector('#app').replaceChildren();
+        document.querySelector('#error-banner').hidden = true;
+        document.querySelector('#telegram-form').reset();
+        document.querySelector('#monitoring-form').reset();
+        document.querySelector('#thresholds').replaceChildren();
+        document.querySelector('#password-form').reset();
+        document.querySelector('#dashboard-header').hidden = true;
+        document.querySelector('#dashboard-layout').hidden = true;
+        document.querySelector('#login-screen').hidden = false;
+        document.querySelector('#login-message').textContent = message;
+        document.querySelector('#login-form').reset();
+      }
+
+      function applyView() {
+        const view = location.hash.slice(1);
+        const current = ['hosts', 'containers', 'security', 'settings'].includes(view) ? view : 'overview';
+        document.querySelector('#app').dataset.current = current;
+        document.querySelector('#app').hidden = current === 'settings';
+        document.querySelector('#settings-page').hidden = current !== 'settings';
+        document.querySelectorAll('.nav-link').forEach((link) => link.classList.toggle('active', link.hash === `#${current}`));
+      }
+
+      async function api(path, method = 'GET', body) {
+        const response = await fetch(path, {
+          method, headers: method === 'GET' ? {} : { 'Content-Type': 'application/json', 'X-Requested-With': 'HomeLab' },
+          body: body === undefined ? undefined : JSON.stringify(body)
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          if (response.status === 401 && authenticated) showLogin();
+          throw new Error(data.detail || `HTTP ${response.status}`);
+        }
+        return data;
+      }
+
+      async function loadTelegram() {
+        const message = document.querySelector('#telegram-message');
+        try {
+          const settings = await api('/api/telegram');
+          const form = document.querySelector('#telegram-form');
+          form.elements.enabled.checked = settings.enabled;
+          form.elements.chat_id.value = settings.chat_id;
+          form.elements.token.value = '';
+          form.querySelectorAll('[name="events"]').forEach((input) => { input.checked = settings.events.includes(input.value); });
+          message.textContent = '';
+        } catch (error) {
+          message.textContent = t('requestFailed', { error: error.message });
+        }
+      }
+
+      async function loadMonitoring() {
+        const message = document.querySelector('#monitoring-message');
+        try {
+          const settings = await api('/api/monitoring');
+          const form = document.querySelector('#monitoring-form');
+          form.elements.temperature_enabled.checked = settings.temperature_enabled;
+          form.elements.daily_report.checked = settings.daily_report;
+          const container = document.querySelector('#thresholds');
+          container.replaceChildren();
+          Object.entries(settings.thresholds).forEach(([name, value]) => {
+            const label = document.createElement('label');
+            const text = document.createElement('span');
+            text.dataset.thresholdHost = name;
+            text.textContent = `${name}: ${t('threshold')}`;
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.min = '-50';
+            input.max = '150';
+            input.step = '0.1';
+            input.required = true;
+            input.dataset.host = name;
+            input.value = value;
+            label.append(text, input);
+            container.append(label);
+          });
+          message.textContent = '';
+        } catch (error) {
+          message.textContent = t('requestFailed', { error: error.message });
+        }
+      }
+
+      async function enterDashboard() {
+        authenticated = true;
+        document.querySelector('#login-screen').hidden = true;
+        document.querySelector('#dashboard-header').hidden = false;
+        document.querySelector('#dashboard-layout').hidden = false;
+        applyView();
+        await Promise.all([loadDashboard(), loadTelegram(), loadMonitoring()]);
+      }
+
+      document.querySelector('#login-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        try {
+          await api('/api/auth/login', 'POST', { password: form.elements.password.value });
+          form.reset();
+          await enterDashboard();
+        } catch (error) {
+          document.querySelector('#login-message').textContent = t('requestFailed', { error: error.message });
+        }
+      });
+
+      document.querySelector('#logout').addEventListener('click', async () => {
+        try { await api('/api/auth/logout', 'POST'); showLogin(); }
+        catch (error) { document.querySelector('#password-message').textContent = t('requestFailed', { error: error.message }); }
+      });
+
+      document.querySelector('#password-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        try {
+          await api('/api/auth/password', 'POST', { current_password: form.elements.current_password.value, new_password: form.elements.new_password.value });
+          form.reset();
+          showLogin(t('passwordChanged'));
+        } catch (error) {
+          document.querySelector('#password-message').textContent = t('requestFailed', { error: error.message });
+        }
+      });
+
+      document.querySelector('#telegram-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const message = document.querySelector('#telegram-message');
+        try {
+          await api('/api/telegram', 'PUT', {
+            enabled: form.elements.enabled.checked, chat_id: form.elements.chat_id.value,
+            token: form.elements.token.value, events: [...form.querySelectorAll('[name="events"]:checked')].map((input) => input.value)
+          });
+          form.elements.token.value = '';
+          message.textContent = t('saved');
+        } catch (error) {
+          message.textContent = t('requestFailed', { error: error.message });
+        }
+      });
+
+      document.querySelector('#monitoring-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const message = document.querySelector('#monitoring-message');
+        try {
+          await api('/api/monitoring', 'PUT', {
+            temperature_enabled: form.elements.temperature_enabled.checked,
+            daily_report: form.elements.daily_report.checked,
+            thresholds: Object.fromEntries([...form.querySelectorAll('[data-host]')].map((input) => [input.dataset.host, Number(input.value)]))
+          });
+          message.textContent = t('saved');
+        } catch (error) {
+          message.textContent = t('requestFailed', { error: error.message });
+        }
+      });
+
+      ['font-size', 'theme'].forEach((setting) => {
+        const input = document.getElementById(setting);
+        const values = setting === 'font-size' ? ['small', 'medium', 'large'] : ['dark', 'light'];
+        const stored = localStorage.getItem(`homelab-${setting}`);
+        input.value = values.includes(stored) ? stored : (setting === 'font-size' ? 'medium' : 'dark');
+        const apply = () => {
+          document.documentElement.dataset[setting === 'font-size' ? 'size' : 'theme'] = input.value;
+          localStorage.setItem(`homelab-${setting}`, input.value);
+        };
+        input.addEventListener('change', apply);
+        apply();
+      });
+
+      window.addEventListener('hashchange', () => {
+        applyView();
+        document.querySelectorAll('#security details').forEach((detail) => {
+          detail.open = location.hash === '#security';
+          saveSecurityDetail(detail);
         });
       });
+      function saveSecurityDetail(detail) {
+        const key = JSON.stringify([detail.closest('[data-host]').dataset.host, detail.dataset.detail]);
+        sessionStorage.setItem(`homelab-security:${location.hash || '#overview'}:${key}`, String(detail.open));
+      }
+      document.querySelector('#app').addEventListener('toggle', (event) => {
+        if (event.target.matches('#security details') && event.target.isConnected) saveSecurityDetail(event.target);
+      }, true);
 
       document.querySelector('#language-select').addEventListener('change', (event) => {
         currentLanguage = event.target.value;
         localStorage.setItem('homelab-dashboard-language', currentLanguage);
         applyTranslations();
+        document.querySelectorAll('[data-threshold-host]').forEach((label) => {
+          label.textContent = `${label.dataset.thresholdHost}: ${t('threshold')}`;
+        });
         updateTimestamp();
         if (latestDashboard) renderDashboard(latestDashboard, latestSample);
         if (latestError) {
@@ -1185,8 +1531,11 @@
       });
 
       applyTranslations();
-      loadDashboard();
-      setInterval(loadDashboard, 15000);
+      api('/api/auth/status').then((status) => {
+        if (status.authenticated) enterDashboard();
+        else showLogin(status.configured ? '' : t('setupRequired'));
+      }).catch((error) => showLogin(t('requestFailed', { error: error.message })));
+      setInterval(() => { if (authenticated) loadDashboard(); }, 15000);
     </script>
   </body>
 </html>
