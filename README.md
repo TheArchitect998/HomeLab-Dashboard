@@ -1,6 +1,6 @@
 # HomeLab Dashboard
 
-A lightweight, self-hosted monitoring dashboard for your home lab. Monitor multiple devices (Raspberry Pi, mini PCs, NAS, etc.) from a single web interface. Track CPU, RAM, disk usage, temperature, and service status with an easy-to-use dashboard.
+A lightweight, self-hosted monitoring dashboard for your home lab. Monitor multiple devices (Raspberry Pi, mini PCs, NAS, etc.) from a single web interface. Track CPU, RAM, disk usage, temperature, and service status with an easy-to-use dashboard. Optional Telegram notifications report SSH logins/logouts, Fail2Ban bans and Docker events, warn about high temperatures per host, and send a daily report at 12:00.
 
 **Perfect for:** Home labs, small server farms, personal infrastructure monitoring.
 
@@ -56,6 +56,14 @@ The new overview groups host metrics, resource trends, Docker status, and firewa
 - Last start timestamp
 - Optional Telegram notifications for SSH sessions, Fail2Ban and Docker events
 - Per-host temperature alerts and a daily Telegram report at 12:00
+
+✅ **Telegram Settings** (Settings → Telegram notifications)
+- Bot token and chat ID (the token is stored locally and never shown again; leave the field empty to keep it)
+- Enable/disable Telegram globally
+- Event types: SSH login, SSH logout, Fail2Ban ban/unban, Docker events
+- Temperature monitoring with a per-host threshold (default 45 °C); reminders every 5 minutes while exceeded and a recovery message
+- Daily report per host after 12:00 (last 24 h of temperatures and SSH/Docker events)
+- Details: [Telegram and temperature monitoring](#telegram-and-temperature-monitoring)
 
 ✅ **Lightweight Storage**
 - Agents do not require a database
