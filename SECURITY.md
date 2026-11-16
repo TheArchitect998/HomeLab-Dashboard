@@ -34,6 +34,9 @@ Security issues caused by exposing the dashboard or agents to the internet witho
 
 ## Known Security Considerations
 
-- **Agent authentication**: agents accept an `X-Agent-Key` header. Set `HOMELAB_AGENT_KEY` on every agent; without it, the metrics endpoint is unauthenticated.
-- **Plain HTTP**: communication between dashboard and agents is unencrypted HTTP. Keep all endpoints on a trusted LAN segment.
-- **Privileged commands**: the agent invokes `sudo` for firewall and Fail2Ban status. Ensure your sudoers configuration only allows the specific commands used here (`NOPASSWD` for `ufw status` and `fail2ban-client`), not broad root access.
+- **Agent authentication**: agents accept an `X-Agent-Key` header. Set a strong `HOMELAB_AGENT_KEY` on every agent and use the same key in the dashboard configuration. A native agent without a key accepts unauthenticated requests; the container agent refuses to start without one.
+- **Network access**: dashboard-to-agent connections use unencrypted HTTP. Restrict agent ports to the dashboard host and use a trusted network or an encrypted tunnel. Use HTTPS for dashboard access across the network to protect passwords and session cookies.
+- **Native agent privileges**: UFW and Fail2Ban status checks use `sudo`. Restrict sudoers to the required status commands, adapting the supplied template to the service user and host command paths. Docker group or socket access grants extensive host privileges. Journal access can expose sensitive system logs.
+- **Container agent privileges**: the Docker socket effectively grants host-root access, even when mounted read-only. The read-only host-root mount may expose sensitive files. Only use trusted images and restrict access to the agent.
+- **Optional container security sources**: host journal, UFW and Fail2Ban access are disabled by default. Enabling them exposes sensitive logs or additional administrative capabilities: a Fail2Ban socket permits administrative commands, and UFW access using `NET_ADMIN` with host networking can change the host firewall. Review the Docker Compose instructions and grant only the access needed.
+- **Secrets and state**: protect agent keys, configuration files, notification credentials and the dashboard state directory or volume, including backups. The state contains password hashes, provider credentials and monitoring data. Do not commit credentials or expose configuration files.
