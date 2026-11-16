@@ -34,7 +34,9 @@ def security_command(tool: str) -> list[str] | None:
         flag = "UFW" if tool == "ufw" else "FAIL2BAN"
         if os.environ.get(f"HOMELAB_ENABLE_{flag}") != "1":
             return None
-        return [tool] if tool == "ufw" else [tool, "-s", "/run/fail2ban/fail2ban.sock"]
+        return [tool] if tool == "ufw" else [
+            tool, "-s", os.environ.get("HOMELAB_FAIL2BAN_SOCKET", "/run/fail2ban/fail2ban.sock")
+        ]
     return ["sudo", "-n", tool]
 
 def run(cmd: list[str], timeout=5) -> dict[str, Any]:
