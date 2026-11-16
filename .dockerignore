@@ -1,0 +1,10 @@
+**
+!Dockerfile
+!Dockerfile.agent
+!backend/
+!dashboard_api.py
+!backend/requirements-dashboard.txt
+!backend/agent.py
+!backend/requirements-agent.txt
+!frontend/
+!frontend/index.html

@@ -1,6 +1,9 @@
 # HomeLab Dashboard
 
-A lightweight, self-hosted monitoring dashboard for your home lab. Monitor multiple devices (Raspberry Pi, mini PCs, NAS, etc.) from a single web interface. Track CPU, RAM, disk usage, temperature, and service status with an easy-to-use dashboard. Optional Telegram notifications report SSH logins/logouts, Fail2Ban bans and Docker events, warn about high temperatures per host, and send a daily report at 12:00.
+HomeLab Dashboard is a self-hosted monitoring dashboard for Linux hosts. It
+provides system metrics, Docker and security information, persistent history,
+and notifications via Telegram, Discord, Ntfy and Pushover. Temperature alerts
+and a daily report with a configurable time help you monitor your homelab.
 
 **Perfect for:** Home labs, small server farms, personal infrastructure monitoring.
 
@@ -28,51 +31,19 @@ A lightweight, self-hosted monitoring dashboard for your home lab. Monitor multi
 
 ## Features
 
-**Dashboard preview (v2.0.0):**
+![HomeLab Dashboard overview](screenshots/dashboard-aktuell.png)
 
-![HomeLab Dashboard v2.0.0](screenshots/dashboard-v2.0.0.png)
+The screenshot uses synthetic example data.
 
-[Latest release: v2.2.0](https://github.com/TheArchitect998/HomeLab-Dashboard/releases/tag/v2.2.0)
-
-The new overview groups host metrics, resource trends, Docker status, and firewall/Fail2Ban details in one responsive view. Resource history is collected in the browser while the dashboard is open.
-
-✅ **Real-time Monitoring**
-- CPU, RAM, disk usage, and temperature
-- Multi-device support with auto-refresh (15s)
-- Switch the interface between German, English, and French; the choice is saved in the browser
-- Dedicated Hosts, Containers and Security views, with containers grouped by host
-- Light/dark mode and adjustable font sizes
-
-✅ **Security Monitoring**
-- UFW firewall status and active rules
-- Fail2Ban status and jail overview
-- Failed login attempt tracking
-- Password-protected dashboard with local initial setup and password changes
-- Expanded security details in the Security view; expanded sections remain open on refresh
-
-✅ **Container Management**
-- Docker container status
-- Container restart history
-- Last start timestamp
-- Optional Telegram notifications for SSH sessions, Fail2Ban and Docker events
-- Per-host temperature alerts and a daily Telegram report at 12:00
-
-✅ **Telegram Settings** (Settings → Telegram notifications)
-- Bot token and chat ID (the token is stored locally and never shown again; leave the field empty to keep it)
-- Enable/disable Telegram globally
-- Event types: SSH login, SSH logout, Fail2Ban ban/unban, Docker events
-- Temperature monitoring with a per-host threshold (default 45 °C); reminders every 5 minutes while exceeded and a recovery message
-- Daily report per host after 12:00 (last 24 h of temperatures and SSH/Docker events)
-- Details: [Telegram and temperature monitoring](#telegram-and-temperature-monitoring)
-
-✅ **Lightweight Storage**
-- Agents do not require a database
-- The dashboard stores password and Telegram settings locally and uses SQLite for reporting
-
-✅ **Easy Deployment**
-- Example systemd service files included
-- Example `.env` configuration and systemd services
-- Python dependencies installed into a virtual environment
+- CPU, RAM, root filesystem and temperature monitoring
+- Persistent per-host metrics history: one sample per minute, retained for 30 days
+- Docker container status, start times and restarts
+- UFW and Fail2Ban status where configured
+- Telegram, Discord, Ntfy and Pushover notifications
+- Per-host temperature alerts and a daily report with a configurable time
+- Password-protected dashboard and optional agent authentication
+- German, English and French interface; light and dark themes
+- Native Linux or Docker deployment on AMD64 and ARM64
 
 ---
 
@@ -110,13 +81,11 @@ The new overview groups host metrics, resource trends, Docker status, and firewa
 - Python 3.11+
 - pip / venv
 - Linux (systemd-enabled, recommended)
-- ~50 MB disk space
 
 **Agent Hosts:**
 - Python 3.11+
 - pip / venv
 - Linux (systemd-enabled, recommended)
-- ~30 MB disk space
 - Optional: UFW, Fail2Ban, Docker (for full feature set)
 
 ---
@@ -187,6 +156,95 @@ uvicorn dashboard_api:app --host 0.0.0.0 --port 8888
 Open `http://localhost:8888` locally and sign in. Use trusted HTTPS for network access; HTTP exposes credentials and session cookies.
 
 ---
+
+## Docker Compose
+
+Both dashboard and agent images can be built on Linux AMD64 and ARM64.
+No prebuilt public image is required.
+
+### Dashboard
+
+```bash
+cp backend/config.example.py homelab-dashboard.config.py
+```
+
+Edit `homelab-dashboard.config.py`: set the agent addresses and a strong
+`AGENT_KEY` shared with the agents. Protect this file; it may contain secrets.
+The container runs as UID/GID 10001 and must be able to read it. Agent
+`127.0.0.1` addresses refer to the dashboard container itself.
+
+```bash
+docker compose build
+docker compose run --rm dashboard python dashboard_api.py setup
+docker compose up -d
+```
+
+The dashboard listens on `127.0.0.1:8888` by default. Set
+`HOMELAB_BIND_ADDRESS` and optionally `HOMELAB_PORT` for a protected LAN.
+The default timezone is UTC; set `HOMELAB_TIMEZONE`, for example to
+`Europe/Berlin`, and recreate the container to change it.
+
+Settings and history are stored in the `dashboard-state` volume. Protect and
+back up this volume. `docker compose down -v` deletes it.
+
+### Agent
+
+On each monitored Linux host, create a protected `.env` file containing the
+same key as the dashboard:
+
+```env
+HOMELAB_AGENT_KEY=replace-with-a-strong-random-key
+HOMELAB_AGENT_BIND_ADDRESS=127.0.0.1
+```
+
+```bash
+chmod 600 .env
+docker compose -f compose.agent.yaml up -d --build
+```
+
+Set `HOMELAB_AGENT_BIND_ADDRESS` to a suitable LAN IP for remote dashboard
+access and restrict port 9100 with the host firewall. Agent communication is
+unencrypted; use a trusted network or encrypted tunnel.
+
+The agent reads host metrics and Docker status. Journal, UFW and Fail2Ban
+access are disabled by default and require additional host access. Unavailable
+sources are shown as unavailable. Docker Desktop reports the Docker Linux VM,
+not the Windows or macOS host.
+
+**Security:** Docker socket access effectively grants host-root privileges,
+even when the socket mount is read-only. The read-only host-root mount may
+expose sensitive files. Only run trusted images and restrict agent access.
+
+#### Optional security sources
+
+The container agent does not access the host journal, UFW or Fail2Ban by
+default. Enable only the sources you need in a local copy of
+`compose.agent.yaml`; keep the existing service settings and mounts.
+
+For SSH and Fail2Ban events, mount the host directory containing its
+`.journal` files read-only at `/host/journal`, and set
+`HOMELAB_JOURNAL_DIR: /host/journal`. The directory is typically
+`/var/log/journal/<machine-id>` or `/run/log/journal/<machine-id>`.
+Journal access exposes sensitive logs.
+
+For Fail2Ban status, set `HOMELAB_ENABLE_FAIL2BAN: "1"` and bind the host
+socket `/run/fail2ban/fail2ban.sock` to the same container path. Socket access
+allows administrative commands even with a read-only mount. The client in the
+image must be compatible with the host's Fail2Ban server.
+
+For UFW status on Linux, set `HOMELAB_ENABLE_UFW: "1"`, mount host `/etc/ufw`
+read-only at `/etc/ufw`, remove `ports`, and set `network_mode: host` and
+`cap_add: [NET_ADMIN]`. `NET_ADMIN` allows changes to the host firewall, and
+the agent listens on all host addresses on port 9100. Restrict access with the
+host firewall. Host networking and compatible UFW/iptables versions are required.
+
+Recreate the container after changes and verify status and real events. Missing
+permissions or sources remain unavailable; the daily report marks missing
+event coverage as incomplete.
+
+To build and publish multi-architecture images to your own registry, use
+`docker buildx build --platform linux/arm64,linux/amd64` with the appropriate
+Dockerfile, image tag and `--push`.
 
 ## Installation
 
@@ -280,20 +338,20 @@ Set a strong key:
 HOMELAB_AGENT_KEY=your-secure-random-key-here
 ```
 
-#### Step 3: Configure sudo (optional but recommended)
+#### Step 3: Configure optional security access
 
-To allow the agent to read UFW and Fail2Ban status without password prompts:
+To read UFW and Fail2Ban status, review the provided sudoers template and
+adjust its username and command paths for your host before installing it:
 
 ```bash
-# Add to sudoers
-sudo visudo
-
-# Add these lines at the end:
-_agent ALL=(ALL) NOPASSWD: /usr/sbin/ufw
-_agent ALL=(ALL) NOPASSWD: /usr/bin/fail2ban-client
+sudo install -m 0440 systemd/homelab-dashboard.sudoers /etc/sudoers.d/homelab-dashboard
+sudo visudo -cf /etc/sudoers.d/homelab-dashboard
 ```
 
-(Replace `_agent` with your actual username if different)
+The template permits specific status commands rather than unrestricted access
+to UFW and Fail2Ban. Journal access for SSH and Fail2Ban event notifications
+must be configured separately. Grant it only after considering that system
+logs can contain sensitive information.
 
 #### Step 4: Test locally
 
@@ -371,25 +429,31 @@ Check agent logs:
 sudo journalctl -u homelab-agent.service -f
 ```
 
-### Updating to v2.2.0
+### Updating to v2.2.1
 
-Update `dashboard_api.py`, `frontend/index.html`, and `backend/agent.py` on each relevant host together, and restart both services. Updating the UI alone from v2.1.0 is not sufficient: v2.2.0 requires the new authentication and monitoring API. Preserve your existing `.env`, add `AGENT_KEY` and `HOMELAB_STATE_DIR`, create the writable state directory, and run `python dashboard_api.py setup` once as the dashboard service user before starting the updated service. Keep your existing `AGENT_URLS`; no migration of their format is required.
+Update the dashboard backend, frontend and agents together. Back up the
+dashboard state directory first, including its settings and SQLite databases.
+Keep the existing `.env` and `AGENT_URLS`; the environment-based configuration
+remains supported.
+
+Install the updated dependencies on the corresponding hosts:
+
+```bash
+pip install -r backend/requirements-dashboard.txt
+pip install -r backend/requirements-agent.txt
+```
+
+Restart the dashboard and agent services after updating their files. Docker
+users can rebuild and recreate the corresponding Compose services instead.
+Verify the dashboard, agent connectivity and notification settings afterwards.
 
 ### Updating the Dashboard UI
 
-To update only the dashboard interface, replace `frontend/index.html` on the dashboard host. The FastAPI app reads this file when a page is requested, so stopping or restarting the service is not required.
-
-From the application directory (shown here as `/opt/homelab-dashboard`), run:
-
-```bash
-cd /opt/homelab-dashboard
-sudo cp frontend/index.html "frontend/index.html.bak.$(date +%Y%m%d-%H%M%S)"
-curl -fL https://github.com/TheArchitect998/HomeLab-Dashboard/releases/download/v2.2.0/index.html -o /tmp/homelab-dashboard-index.html
-sudo install -m 0644 /tmp/homelab-dashboard-index.html frontend/index.html
-rm /tmp/homelab-dashboard-index.html
-```
-
-Open or refresh the dashboard in your browser. If the old styles are still cached, force-refresh the page (for example, `Ctrl+F5`). Use this UI-only procedure only when the installed backend is already compatible with that release.
+For a UI-only update, use a frontend version compatible with the installed
+backend. Back up the deployed `frontend/index.html`, then copy the new
+`frontend/index.html` from the checked-out release into the dashboard's
+frontend directory. The dashboard reads this file on each page request, so a
+service restart is not required for a UI-only update.
 
 ---
 
@@ -409,17 +473,34 @@ Then restart the dashboard:
 sudo systemctl restart homelab-dashboard.service
 ```
 
-### Telegram and temperature monitoring
+### Notifications, temperature alerts and daily report
 
-1. Create a Telegram bot, send it a message, and obtain its bot token and the destination chat ID. The bot ID is not the chat ID.
-2. In **Settings → Telegram notifications**, enter the token and chat ID, select event types and enable Telegram. Save these settings before enabling temperature monitoring or the daily report below. Leaving the token field empty retains the saved token.
-3. Configure the per-host temperature thresholds (default 45 °C), alerts and the daily report in the same section. Save this subsection separately. A warning is sent when the threshold is exceeded, reminders follow every five minutes while it remains high, and a recovery message is sent when it returns to or below the threshold.
-4. SSH and Fail2Ban notifications and SSH counts need readable system journal entries. Grant the agent user journal access (for example via the `systemd-journal` group) and restart the agent; this grants access to potentially sensitive logs. SSH uses PAM session-open/session-close entries and, where available, a matching SSH acceptance entry for the remote IP. Fail2Ban must log ban/unban messages to the journal.
-5. Docker events require Docker CLI access for the agent user. Docker group membership grants privileged access. Run an up-to-date agent on every monitored machine, including the dashboard host if it should also be monitored.
+Under **Notifications**, select Telegram, Discord, Ntfy or Pushover and
+configure the provider. Multiple providers can be enabled at the same time.
+Use the test button to verify delivery. Stored credentials are not displayed;
+leaving a secret field empty retains the saved value.
 
-The report is sent once per host after 12:00 in the dashboard host's timezone. It covers the last 24 hours of temperature samples and SSH/Docker events, including event types whose individual Telegram notifications are disabled. Data collection starts when the report is enabled; old script logs are not imported, and incomplete coverage is marked. Docker and journal retention, outages and delayed polling can limit the results. After a delayed startup or a send failure, the report is retried when possible.
+Enable temperature alerts and/or the daily report under **Temperature and
+daily report**. At least one provider must be enabled. Temperature thresholds
+are configured per host. Alerts repeat every five minutes while the threshold
+is exceeded; a recovery message follows when the temperature returns to normal.
 
-Settings, the password hash, the bot token and the reporting SQLite database are stored under `HOMELAB_STATE_DIR`; protect this directory and its backups. The SQLite database retains approximately 25 hours of samples and events. Run one dashboard worker only. Disable older Telegram scripts after verifying the new notifications to avoid duplicates.
+Choose the report time in the dashboard. The default is 12:00 in the
+dashboard process's timezone. The report is sent once per host and provider
+after the selected time and covers the previous 24 hours. If delivery fails,
+it is retried when possible on the same day. Incomplete event or temperature
+coverage is marked in the report.
+
+SSH and Fail2Ban events require readable host journal entries; Docker events
+require access to the Docker socket. Grant these permissions deliberately:
+journal access exposes potentially sensitive logs, and Docker socket access
+effectively grants host-root privileges. Container agents need the relevant
+optional host access enabled separately.
+
+Settings, provider credentials and monitoring databases are stored in the
+dashboard state directory. Protect and back up this directory. Resource history
+is sampled every minute and retained for 30 days; report events and temperature
+samples are retained for approximately 25 hours. Run one dashboard worker only.
 
 ### Changing Ports
 

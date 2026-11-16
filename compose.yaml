@@ -1,0 +1,21 @@
+services:
+  dashboard:
+    build: .
+    image: homelab-dashboard:local
+    restart: unless-stopped
+    environment:
+      TZ: "${HOMELAB_TIMEZONE:-Etc/UTC}"
+      HOMELAB_DASHBOARD_CONFIG: /etc/homelab-dashboard.py
+    ports:
+      - "${HOMELAB_BIND_ADDRESS:-127.0.0.1}:${HOMELAB_PORT:-8888}:8888"
+    volumes:
+      - type: bind
+        source: ./homelab-dashboard.config.py
+        target: /etc/homelab-dashboard.py
+        read_only: true
+        bind:
+          create_host_path: false
+      - dashboard-state:/opt/homelab-dashboard/state
+
+volumes:
+  dashboard-state:

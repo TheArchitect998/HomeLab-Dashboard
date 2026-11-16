@@ -7,6 +7,35 @@ from fastapi import FastAPI, Header, HTTPException, Query
 
 app = FastAPI(title="HomeLab agent", docs_url=None, redoc_url=None)
 KEY = os.environ.get("HOMELAB_AGENT_KEY", "")
+CONTAINER_MODE = os.environ.get("HOMELAB_AGENT_CONTAINER") == "1"
+if CONTAINER_MODE:
+    if not KEY.strip():
+        raise RuntimeError("HOMELAB_AGENT_KEY is required for the container agent")
+    psutil.PROCFS_PATH = "/host/proc"
+
+
+def journal_command() -> list[str]:
+    if not CONTAINER_MODE:
+        return ["journalctl"]
+    directory = os.environ.get("HOMELAB_JOURNAL_DIR", "")
+    if not directory or not os.path.isdir(directory):
+        raise HTTPException(503, "Host journal is not configured or accessible")
+    try:
+        with os.scandir(directory) as entries:
+            if not any(entry.name.endswith((".journal", ".journal~")) for entry in entries):
+                raise HTTPException(503, "Host journal directory contains no journal files")
+    except OSError as error:
+        raise HTTPException(503, f"Host journal is not accessible: {error}") from error
+    return ["journalctl", f"--directory={directory}"]
+
+
+def security_command(tool: str) -> list[str] | None:
+    if CONTAINER_MODE:
+        flag = "UFW" if tool == "ufw" else "FAIL2BAN"
+        if os.environ.get(f"HOMELAB_ENABLE_{flag}") != "1":
+            return None
+        return [tool] if tool == "ufw" else [tool, "-s", "/run/fail2ban/fail2ban.sock"]
+    return ["sudo", "-n", tool]
 
 def run(cmd: list[str], timeout=5) -> dict[str, Any]:
     try:
@@ -21,14 +50,24 @@ def auth(x_agent_key: str | None):
         raise HTTPException(401, "invalid agent key")
 
 def firewall() -> dict[str, Any]:
-    result = run(["sudo", "-n", "ufw", "status"])
+    command = security_command("ufw")
+    if command is None:
+        return {"active": None, "raw": "UFW access is not enabled for this agent."}
+    result = run(command + ["status"])
     status = result["out"]
-    active = "status: active" in status.lower()
-    return {"active": active, "raw": status if status else "UFW is inactive or not configured."}
+    if result["rc"] != 0 or not re.search(r"status:\s*(active|inactive)\b", status, re.I):
+        return {"active": None, "raw": status or "UFW status could not be determined."}
+    active = bool(re.search(r"status:\s*active\b", status, re.I))
+    return {"active": active, "raw": status}
 
 def fail2ban() -> dict[str, Any]:
-    result = run(["sudo", "-n", "fail2ban-client", "status"])
+    command = security_command("fail2ban-client")
+    if command is None:
+        return {"active": None, "jails": [], "details": {}, "raw": "Fail2Ban access is not enabled for this agent."}
+    result = run(command + ["status"])
     status = result["out"]
+    if result["rc"] != 0 or "jail list:" not in status.lower():
+        return {"active": None, "jails": [], "details": {}, "raw": status or "Fail2Ban status could not be determined."}
     active = "jail list:" in status.lower()
     jails, details = [], {}
     if active:
@@ -41,23 +80,28 @@ def fail2ban() -> dict[str, Any]:
 
         # Get details for each jail
         for jail in jails:
-            out = run(["sudo", "-n", "fail2ban-client", "status", jail])
+            out = run(command + ["status", jail])
             details[jail] = out["out"]
     return {"active": active, "jails": jails, "details": details, "raw": status if status else "Fail2Ban not active or not configured."}
 
-def docker() -> list[dict[str, Any]]:
+def docker() -> tuple[list[dict[str, Any]], str | None]:
     raw = run(["docker", "ps", "-a", "--format", "{{json .}}"])
+    if raw["rc"] != 0:
+        return [], raw["out"] or "Docker status could not be determined."
     result = []
+    errors = []
     for line in raw["out"].splitlines():
         try:
             x = json.loads(line)
             name = x.get("Names", "")
             inspect = run(["docker", "inspect", "--format", "{{json .State}}", name])
+            if inspect["rc"] != 0:
+                errors.append(f"{name}: {inspect['out'] or 'Docker inspect failed'}")
             state = json.loads(inspect["out"]) if inspect["out"].startswith("{") else {}
             result.append({"name": name, "image": x.get("Image"), "status": x.get("Status"), "state": state.get("Status"), "started_at": state.get("StartedAt"), "restart_count": state.get("RestartCount", 0)})
-        except Exception:
-            pass
-    return result
+        except (ValueError, TypeError, AttributeError) as error:
+            errors.append(f"Invalid Docker response: {error}")
+    return result, "; ".join(errors) or None
 
 def ssh_session_details(entry: dict[str, Any], timestamp: float, kind: str) -> dict[str, Any]:
     match = re.search(r"session (?:opened|closed) for user ([^\s(]+)", entry["MESSAGE"])
@@ -67,7 +111,7 @@ def ssh_session_details(entry: dict[str, Any], timestamp: float, kind: str) -> d
     if not user or not isinstance(pid, str) or not re.fullmatch(r"\d+", pid) or not isinstance(boot_id, str) or not re.fullmatch(r"[a-fA-F0-9]{32}", boot_id):
         return details
 
-    result = run(["journalctl", "--no-pager", "-o", "json", f"_BOOT_ID={boot_id}",
+    result = run(journal_command() + ["--no-pager", "-o", "json", f"_BOOT_ID={boot_id}",
                   f"_PID={pid}", "--until", f"@{int(timestamp) + 1}"], timeout=15)
     if result["rc"] != 0:
         raise HTTPException(503, f"SSH journal read failed: {result['out']}")
@@ -116,7 +160,7 @@ def events(since: int, until: int, types: list[str] = Query(default=[]), details
         raise HTTPException(400, "Invalid event query")
     events_found = []
     if set(types) & {"ssh_login", "ssh_logout", "fail2ban"}:
-        result = run(["journalctl", "--no-pager", "-o", "json", "--since", f"@{since}", "--until", f"@{until}"], timeout=15)
+        result = run(journal_command() + ["--no-pager", "-o", "json", "--since", f"@{since}", "--until", f"@{until}"], timeout=15)
         if result["rc"] != 0:
             raise HTTPException(503, f"Journal read failed: {result['out']}")
         for line in result["out"].splitlines():
@@ -169,11 +213,12 @@ def health(x_agent_key: str | None = Header(default=None)):
 @app.get("/api/metrics")
 def metrics(x_agent_key: str | None = Header(default=None)):
     auth(x_agent_key)
-    root = shutil.disk_usage("/")
+    root = shutil.disk_usage("/host/root" if CONTAINER_MODE else "/")
     temp = None
     try:
         temps = psutil.sensors_temperatures()
         values = [v.current for group in temps.values() for v in group if v.current is not None]
         temp = round(max(values), 1) if values else None
     except Exception: pass
-    return {"host": socket.gethostname(), "platform": platform.platform(), "timestamp": datetime.now(timezone.utc).isoformat(), "temperature_c": temp, "cpu_percent": psutil.cpu_percent(interval=0.2), "ram_percent": psutil.virtual_memory().percent, "storage_percent": round(root.used / root.total * 100, 1), "storage_free_bytes": root.free, "uptime_seconds": int(time.time() - psutil.boot_time()), "ufw": firewall(), "fail2ban": fail2ban(), "docker": docker()}
+    containers, docker_error = docker()
+    return {"host": socket.gethostname(), "platform": platform.platform(), "timestamp": datetime.now(timezone.utc).isoformat(), "temperature_c": temp, "cpu_percent": psutil.cpu_percent(interval=0.2), "ram_percent": psutil.virtual_memory().percent, "storage_percent": round(root.used / root.total * 100, 1), "storage_free_bytes": root.free, "uptime_seconds": int(time.time() - psutil.boot_time()), "ufw": firewall(), "fail2ban": fail2ban(), "docker": containers, "docker_error": docker_error}

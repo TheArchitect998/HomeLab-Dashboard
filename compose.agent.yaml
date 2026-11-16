@@ -1,0 +1,37 @@
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    image: homelab-agent:local
+    restart: unless-stopped
+    environment:
+      HOMELAB_AGENT_KEY: "${HOMELAB_AGENT_KEY:?Set HOMELAB_AGENT_KEY before starting the agent}"
+    ports:
+      - "${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}:${HOMELAB_AGENT_PORT:-9100}:9100"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - type: bind
+        source: /proc
+        target: /host/proc
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /
+        target: /host/root
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
+        bind:
+          create_host_path: false
