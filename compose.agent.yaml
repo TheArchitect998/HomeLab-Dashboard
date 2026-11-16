@@ -7,6 +7,7 @@ services:
     restart: unless-stopped
     environment:
       HOMELAB_AGENT_KEY: "${HOMELAB_AGENT_KEY:?Set HOMELAB_AGENT_KEY before starting the agent}"
+      HOMELAB_JOURNAL_DIR: "${HOMELAB_JOURNAL_DIR:-}"
     ports:
       - "${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}:${HOMELAB_AGENT_PORT:-9100}:9100"
     cap_drop:
