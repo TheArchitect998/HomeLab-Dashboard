@@ -213,10 +213,10 @@ Set `HOMELAB_AGENT_BIND_ADDRESS` to a suitable LAN IP for remote dashboard
 access and restrict port 9100 with the host firewall. Agent communication is
 unencrypted; use a trusted network or encrypted tunnel.
 
-The agent reads host metrics and Docker status. Journal, UFW and Fail2Ban
-access are disabled by default and require additional host access. Unavailable
-sources are shown as unavailable. Docker Desktop reports the Docker Linux VM,
-not the Windows or macOS host.
+The agent reads host metrics and Docker status. Journal event collection and
+UFW and Fail2Ban status checks are disabled by default. Unavailable sources are
+shown as unavailable. Docker Desktop reports the Docker Linux VM, not the
+Windows or macOS host.
 
 **Security:** Docker socket access effectively grants host-root privileges,
 even when the socket mount is read-only. The read-only host-root mount may
@@ -224,15 +224,20 @@ expose sensitive files. Only run trusted images and restrict agent access.
 
 #### Optional security sources
 
-The container agent does not access the host journal, UFW or Fail2Ban by
-default. Enable only the sources you need in a local copy of
-`compose.agent.yaml`; keep the existing service settings and mounts.
+Journal event collection and UFW and Fail2Ban status checks are disabled by
+default. The existing read-only host-root mount may nevertheless expose
+sensitive files, including system logs, to the container.
 
-For SSH and Fail2Ban events, mount the host directory containing its
-`.journal` files read-only at `/host/journal`, and set
-`HOMELAB_JOURNAL_DIR: /host/journal`. The directory is typically
-`/var/log/journal/<machine-id>` or `/run/log/journal/<machine-id>`.
+For SSH and Fail2Ban events, set `HOMELAB_JOURNAL_DIR` to the host journal
+directory as seen through the existing `/host/root` mount, for example
+`/host/root/var/log/journal/<machine-id>` or
+`/host/root/run/log/journal/<machine-id>`. Choose the directory on each host
+that actually contains its `.journal` files and verify that the container can
+read them. Collection fails if the directory or journal files are unavailable.
 Journal access exposes sensitive logs.
+
+For UFW or Fail2Ban status, enable only the sources you need in a local copy of
+`compose.agent.yaml`; keep the existing service settings and mounts.
 
 For Fail2Ban status, set `HOMELAB_ENABLE_FAIL2BAN: "1"` and bind the host
 socket `/run/fail2ban/fail2ban.sock` to the same container path. Socket access
