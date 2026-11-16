@@ -1,0 +1,2 @@
+Cmnd_Alias HOMELAB_READONLY = /usr/bin/ufw status, /usr/bin/fail2ban-client status, /usr/bin/fail2ban-client status *
+user ALL=(root) NOPASSWD: HOMELAB_READONLY

@@ -623,7 +623,18 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" /><path d="m9 12 2 2 4-4" /></svg>
           <span data-i18n="security">Sicherheit</span>
         </a>
-        <a class="nav-link" href="#settings"><span data-i18n="settings">Einstellungen</span></a>
+        <a class="nav-link" href="#history">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l4 2" /></svg>
+          <span data-i18n="history">Verlauf</span>
+        </a>
+        <a class="nav-link" href="#notifications">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>
+          <span data-i18n="notifications">Benachrichtigungen</span>
+        </a>
+        <a class="nav-link" href="#settings">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12m9.9 9.9 2.12 2.12M2 12h3m14 0h3M4.93 19.07l2.12-2.12m9.9-9.9 2.12-2.12" /><circle cx="12" cy="12" r="7" /></svg>
+          <span data-i18n="settings">Einstellungen</span>
+        </a>
         <span class="sidebar-note" data-i18n="pollInterval">Abfrage alle 15 Sekunden</span>
       </nav>
 
@@ -643,29 +654,6 @@
             </div>
           </section>
           <section class="panel form-panel">
-            <h2 data-i18n="telegram">Telegram-Mitteilungen</h2>
-            <form id="telegram-form">
-              <label class="check"><input name="enabled" type="checkbox" /><span data-i18n="telegramEnabled">Telegram aktivieren</span></label>
-              <label><span data-i18n="chatId">Chat-ID</span><input name="chat_id" autocomplete="off" /></label>
-              <label><span data-i18n="botToken">Bot-Token (leer lassen, um das gespeicherte Token beizubehalten)</span><input name="token" type="password" autocomplete="off" /></label>
-              <span data-i18n="notifyEvents">Benachrichtigen bei</span>
-              <label class="check"><input name="events" type="checkbox" value="ssh_login" /><span data-i18n="sshLogin">SSH-Anmeldung</span></label>
-              <label class="check"><input name="events" type="checkbox" value="ssh_logout" /><span data-i18n="sshLogout">SSH-Abmeldung</span></label>
-              <label class="check"><input name="events" type="checkbox" value="fail2ban" /><span data-i18n="fail2banEvents">Fail2Ban Ban/Unban</span></label>
-              <label class="check"><input name="events" type="checkbox" value="docker" /><span data-i18n="dockerEvents">Docker Start/Stopp</span></label>
-              <button type="submit" data-i18n="save">Speichern</button>
-              <p id="telegram-message" role="status"></p>
-            </form>
-            <h3 data-i18n="monitoringTitle">Temperatur und Tagesbericht</h3>
-            <form id="monitoring-form">
-              <label class="check"><input name="temperature_enabled" type="checkbox" /><span data-i18n="temperatureAlerts">Temperaturwarnungen aktivieren (alle 5 Minuten)</span></label>
-              <label class="check"><input name="daily_report" type="checkbox" /><span data-i18n="dailyReport">Tagesbericht um 12:00 Uhr aktivieren</span></label>
-              <div id="thresholds" class="form-fields"></div>
-              <button type="submit" data-i18n="save">Speichern</button>
-              <p id="monitoring-message" role="status"></p>
-            </form>
-          </section>
-          <section class="panel form-panel">
             <h2 data-i18n="changePassword">Passwort ändern</h2>
             <form id="password-form">
               <label><span data-i18n="currentPassword">Aktuelles Passwort</span><input name="current_password" type="password" autocomplete="current-password" required /></label>
@@ -675,6 +663,110 @@
             </form>
           </section>
           <section class="panel form-panel"><button id="logout" type="button" data-i18n="logout">Abmelden</button></section>
+        </div>
+        <div id="notifications-page" class="settings-grid" hidden>
+          <section class="panel form-panel">
+            <h2 data-i18n="notifications">Benachrichtigungen</h2>
+            <label><span data-i18n="notificationProvider">Anbieter</span>
+              <select id="notification-provider">
+                <option value="telegram">Telegram</option>
+                <option value="discord">Discord</option>
+                <option value="ntfy">Ntfy</option>
+                <option value="pushover">Pushover</option>
+              </select>
+            </label>
+            <p data-i18n="providersIndependent">Mehrere Anbieter können gleichzeitig aktiviert werden. Die Auswahl dient zur Bearbeitung.</p>
+            <form id="telegram-form" data-provider-form="telegram">
+              <h3 data-i18n="telegram">Telegram-Mitteilungen</h3>
+              <p data-credential-status></p>
+              <label class="check"><input name="enabled" type="checkbox" /><span data-i18n="telegramEnabled">Telegram aktivieren</span></label>
+              <label><span data-i18n="chatId">Chat-ID</span><input name="chat_id" autocomplete="off" /></label>
+              <label><span data-i18n="botToken">Bot-Token (leer lassen, um das gespeicherte Token beizubehalten)</span><input name="token" type="password" autocomplete="off" /></label>
+              <span data-i18n="notifyEvents">Benachrichtigen bei</span>
+              <label class="check"><input name="events" type="checkbox" value="ssh_login" /><span data-i18n="sshLogin">SSH-Anmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="ssh_logout" /><span data-i18n="sshLogout">SSH-Abmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="fail2ban" /><span data-i18n="fail2banEvents">Fail2Ban Ban/Unban</span></label>
+              <label class="check"><input name="events" type="checkbox" value="docker" /><span data-i18n="dockerEvents">Docker Start/Stopp</span></label>
+              <button type="submit" data-i18n="save">Speichern</button>
+              <button type="button" data-test-provider="telegram" data-i18n="sendTest">Testnachricht senden</button>
+              <p id="telegram-message" role="status"></p>
+            </form>
+            <form id="discord-form" data-provider-form="discord" hidden>
+              <h3>Discord</h3>
+              <p data-credential-status></p>
+              <label class="check"><input name="enabled" type="checkbox" /><span data-i18n="providerEnabled">Anbieter aktivieren</span></label>
+              <label><span data-i18n="discordWebhook">Webhook-URL (leer lassen, um die gespeicherte URL beizubehalten)</span><input name="webhook_url" type="password" autocomplete="new-password" /></label>
+              <span data-i18n="notifyEvents">Benachrichtigen bei</span>
+              <label class="check"><input name="events" type="checkbox" value="ssh_login" /><span data-i18n="sshLogin">SSH-Anmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="ssh_logout" /><span data-i18n="sshLogout">SSH-Abmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="fail2ban" /><span data-i18n="fail2banEvents">Fail2Ban Ban/Unban</span></label>
+              <label class="check"><input name="events" type="checkbox" value="docker" /><span data-i18n="dockerEvents">Docker Start/Stopp</span></label>
+              <button type="submit" data-i18n="save">Speichern</button>
+              <button type="button" data-test-provider="discord" data-i18n="sendTest">Testnachricht senden</button>
+              <p id="discord-message" role="status"></p>
+            </form>
+            <form id="ntfy-form" data-provider-form="ntfy" hidden>
+              <h3>Ntfy</h3>
+              <p data-credential-status></p>
+              <label class="check"><input name="enabled" type="checkbox" /><span data-i18n="providerEnabled">Anbieter aktivieren</span></label>
+              <label><span data-i18n="ntfyServer">Server-URL</span><input name="server_url" type="url" autocomplete="off" /></label>
+              <label><span data-i18n="ntfyTopic">Topic (leer lassen, um das gespeicherte Topic beizubehalten)</span><input name="topic" type="password" autocomplete="new-password" /></label>
+              <label><span data-i18n="ntfyToken">Zugriffstoken, optional (leer lassen, um das gespeicherte Token beizubehalten)</span><input name="token" type="password" autocomplete="new-password" /></label>
+              <label class="check"><input name="clear_token" type="checkbox" /><span data-i18n="clearToken">Gespeichertes Zugriffstoken entfernen</span></label>
+              <span data-i18n="notifyEvents">Benachrichtigen bei</span>
+              <label class="check"><input name="events" type="checkbox" value="ssh_login" /><span data-i18n="sshLogin">SSH-Anmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="ssh_logout" /><span data-i18n="sshLogout">SSH-Abmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="fail2ban" /><span data-i18n="fail2banEvents">Fail2Ban Ban/Unban</span></label>
+              <label class="check"><input name="events" type="checkbox" value="docker" /><span data-i18n="dockerEvents">Docker Start/Stopp</span></label>
+              <button type="submit" data-i18n="save">Speichern</button>
+              <button type="button" data-test-provider="ntfy" data-i18n="sendTest">Testnachricht senden</button>
+              <p id="ntfy-message" role="status"></p>
+            </form>
+            <form id="pushover-form" data-provider-form="pushover" hidden>
+              <h3>Pushover</h3>
+              <p data-credential-status></p>
+              <label class="check"><input name="enabled" type="checkbox" /><span data-i18n="providerEnabled">Anbieter aktivieren</span></label>
+              <label><span data-i18n="pushoverToken">App-Token (leer lassen, um das gespeicherte Token beizubehalten)</span><input name="token" type="password" autocomplete="new-password" /></label>
+              <label><span data-i18n="pushoverUser">User-/Group-Key (leer lassen, um den gespeicherten Key beizubehalten)</span><input name="user_key" type="password" autocomplete="new-password" /></label>
+              <span data-i18n="notifyEvents">Benachrichtigen bei</span>
+              <label class="check"><input name="events" type="checkbox" value="ssh_login" /><span data-i18n="sshLogin">SSH-Anmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="ssh_logout" /><span data-i18n="sshLogout">SSH-Abmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="fail2ban" /><span data-i18n="fail2banEvents">Fail2Ban Ban/Unban</span></label>
+              <label class="check"><input name="events" type="checkbox" value="docker" /><span data-i18n="dockerEvents">Docker Start/Stopp</span></label>
+              <button type="submit" data-i18n="save">Speichern</button>
+              <button type="button" data-test-provider="pushover" data-i18n="sendTest">Testnachricht senden</button>
+              <p id="pushover-message" role="status"></p>
+            </form>
+          </section>
+          <section class="panel form-panel">
+            <h2 data-i18n="monitoringTitle">Temperatur und Tagesbericht</h2>
+            <form id="monitoring-form">
+              <label class="check"><input name="temperature_enabled" type="checkbox" /><span data-i18n="temperatureAlerts">Temperaturwarnungen aktivieren (alle 5 Minuten)</span></label>
+              <label class="check"><input name="daily_report" type="checkbox" /><span data-i18n="dailyReport">Tagesbericht aktivieren</span></label>
+              <label><span data-i18n="dailyReportTime">Uhrzeit des Tagesberichts (Zeitzone des Dashboards)</span><input name="daily_report_time" type="time" value="12:00" required /></label>
+              <div id="thresholds" class="form-fields"></div>
+              <button type="submit" data-i18n="save">Speichern</button>
+              <p id="monitoring-message" role="status"></p>
+            </form>
+          </section>
+        </div>
+        <div id="history-page" class="settings-grid" hidden>
+          <section class="panel form-panel">
+            <h2 data-i18n="history">Verlauf</h2>
+            <div class="form-fields">
+              <label><span data-i18n="historyHost">Host</span><select id="history-host"></select></label>
+              <label><span data-i18n="historyRange">Zeitraum</span>
+                <select id="history-range">
+                  <option value="1" data-i18n="historyHour">Letzte Stunde</option>
+                  <option value="24" data-i18n="historyDay" selected>Letzte 24 Stunden</option>
+                  <option value="168" data-i18n="historyWeek">Letzte 7 Tage</option>
+                  <option value="720" data-i18n="historyMonth">Letzte 30 Tage</option>
+                </select>
+              </label>
+            </div>
+            <p id="history-message" role="status"></p>
+          </section>
+          <div id="history-charts" class="dashboard-grid"></div>
         </div>
         <footer class="page-footer"><span data-i18n="author">Autor</span>: <a href="https://github.com/TheArchitect998" target="_blank" rel="noopener noreferrer">TheArchitect998</a></footer>
       </main>
@@ -689,6 +781,8 @@
       let latestSample = null;
       let latestError = null;
       let latestUpdatedAt = null;
+      let historyData = null;
+      let historyRequest = 0;
 
       const translations = {
         de: {
@@ -904,7 +998,23 @@
       };
 
       Object.assign(translations.de, {
-        settings: 'Einstellungen', appearance: 'Darstellung', fontSize: 'Schriftgröße',
+        settings: 'Einstellungen', notifications: 'Benachrichtigungen', history: 'Verlauf',
+        notificationProvider: 'Anbieter', providersIndependent: 'Mehrere Anbieter können gleichzeitig aktiviert werden. Die Auswahl dient zur Bearbeitung.',
+        providerEnabled: 'Anbieter aktivieren', discordWebhook: 'Webhook-URL (leer lassen, um die gespeicherte URL beizubehalten)',
+        ntfyServer: 'Server-URL', ntfyTopic: 'Topic (leer lassen, um das gespeicherte Topic beizubehalten)',
+        ntfyToken: 'Zugriffstoken, optional (leer lassen, um das gespeicherte Token beizubehalten)',
+        clearToken: 'Gespeichertes Zugriffstoken entfernen', pushoverToken: 'App-Token (leer lassen, um das gespeicherte Token beizubehalten)',
+        pushoverUser: 'User-/Group-Key (leer lassen, um den gespeicherten Key beizubehalten)',
+        sendTest: 'Testnachricht senden', testSent: 'Testnachricht gesendet.',
+        credentialsPresent: 'Zugangsdaten gespeichert.', credentialsMissing: 'Zugangsdaten noch nicht vollständig.',
+        providerPaused: 'Zustellung pausiert. Konfiguration prüfen und Testnachricht senden; Details stehen im Dashboard-Log.',
+        historyHost: 'Host', historyRange: 'Zeitraum', historyHour: 'Letzte Stunde', historyDay: 'Letzte 24 Stunden',
+        historyWeek: 'Letzte 7 Tage', historyMonth: 'Letzte 30 Tage',
+        historyLoading: 'Verlauf wird geladen …', historyNoHosts: 'Keine Hosts konfiguriert.',
+        historyGaps: '{count} Zeitabschnitte mit fehlenden Messungen. Leere Abschnitte erscheinen als Lücken; teilweise gefüllte sind durch Kreise markiert.',
+        historyComplete: 'Alle Messungen im gewählten Zeitraum vorhanden.',
+        historyIncomplete: 'Unvollständiger Zeitabschnitt',
+        appearance: 'Darstellung', fontSize: 'Schriftgröße',
         small: 'Klein', medium: 'Mittel', large: 'Groß', theme: 'Design', dark: 'Dunkel', light: 'Hell',
         telegram: 'Telegram-Mitteilungen', telegramEnabled: 'Telegram aktivieren', chatId: 'Chat-ID',
         botToken: 'Bot-Token (leer lassen, um das gespeicherte Token beizubehalten)',
@@ -915,10 +1025,26 @@
         setupRequired: 'Das Passwort muss zuerst lokal auf dem Dashboard-Host eingerichtet werden.',
         saved: 'Gespeichert.', requestFailed: 'Anfrage fehlgeschlagen: {error}', passwordChanged: 'Passwort geändert. Bitte erneut anmelden.',
         monitoringTitle: 'Temperatur und Tagesbericht', temperatureAlerts: 'Temperaturwarnungen aktivieren (alle 5 Minuten)',
-        dailyReport: 'Tagesbericht um 12:00 Uhr aktivieren', threshold: 'Temperaturschwelle (°C)'
+        dailyReport: 'Tagesbericht aktivieren', dailyReportTime: 'Uhrzeit des Tagesberichts (Zeitzone des Dashboards)', threshold: 'Temperaturschwelle (°C)',
+        unavailable: 'Nicht verfügbar', dockerUnavailable: 'Docker-Abfrage fehlgeschlagen'
       });
       Object.assign(translations.en, {
-        settings: 'Settings', appearance: 'Appearance', fontSize: 'Font size',
+        settings: 'Settings', notifications: 'Notifications', history: 'History',
+        notificationProvider: 'Provider', providersIndependent: 'Multiple providers can be enabled simultaneously. Select one to edit its settings.',
+        providerEnabled: 'Enable provider', discordWebhook: 'Webhook URL (leave empty to keep the saved URL)',
+        ntfyServer: 'Server URL', ntfyTopic: 'Topic (leave empty to keep the saved topic)',
+        ntfyToken: 'Access token, optional (leave empty to keep the saved token)', clearToken: 'Remove saved access token',
+        pushoverToken: 'App token (leave empty to keep the saved token)', pushoverUser: 'User/group key (leave empty to keep the saved key)',
+        sendTest: 'Send test notification', testSent: 'Test notification sent.',
+        credentialsPresent: 'Credentials saved.', credentialsMissing: 'Credentials are incomplete.',
+        providerPaused: 'Delivery paused. Check the configuration and send a test notification; see the dashboard log for details.',
+        historyHost: 'Host', historyRange: 'Time range', historyHour: 'Last hour', historyDay: 'Last 24 hours',
+        historyWeek: 'Last 7 days', historyMonth: 'Last 30 days',
+        historyLoading: 'Loading history …', historyNoHosts: 'No hosts configured.',
+        historyGaps: '{count} time intervals have missing samples. Empty intervals appear as gaps; partially filled intervals are marked with circles.',
+        historyComplete: 'All samples are present in the selected time range.',
+        historyIncomplete: 'Incomplete time interval',
+        appearance: 'Appearance', fontSize: 'Font size',
         small: 'Small', medium: 'Medium', large: 'Large', theme: 'Theme', dark: 'Dark', light: 'Light',
         telegram: 'Telegram notifications', telegramEnabled: 'Enable Telegram', chatId: 'Chat ID',
         botToken: 'Bot token (leave empty to keep the saved token)', notifyEvents: 'Notify about',
@@ -929,10 +1055,27 @@
         setupRequired: 'Set the password locally on the dashboard host first.',
         saved: 'Saved.', requestFailed: 'Request failed: {error}', passwordChanged: 'Password changed. Please log in again.',
         monitoringTitle: 'Temperature and daily report', temperatureAlerts: 'Enable temperature alerts (every 5 minutes)',
-        dailyReport: 'Enable daily report at 12:00', threshold: 'Temperature threshold (°C)'
+        dailyReport: 'Enable daily report', dailyReportTime: 'Daily report time (dashboard time zone)', threshold: 'Temperature threshold (°C)',
+        unavailable: 'Unavailable', dockerUnavailable: 'Docker query failed'
       });
       Object.assign(translations.fr, {
-        settings: 'Paramètres', appearance: 'Apparence', fontSize: 'Taille du texte',
+        settings: 'Paramètres', notifications: 'Notifications', history: 'Historique',
+        notificationProvider: 'Fournisseur', providersIndependent: 'Plusieurs fournisseurs peuvent être activés simultanément. Sélectionnez-en un pour le configurer.',
+        providerEnabled: 'Activer le fournisseur', discordWebhook: 'URL du webhook (laisser vide pour conserver l’URL enregistrée)',
+        ntfyServer: 'URL du serveur', ntfyTopic: 'Sujet (laisser vide pour conserver le sujet enregistré)',
+        ntfyToken: 'Jeton d’accès facultatif (laisser vide pour conserver le jeton enregistré)', clearToken: 'Supprimer le jeton d’accès enregistré',
+        pushoverToken: 'Jeton de l’application (laisser vide pour conserver le jeton enregistré)',
+        pushoverUser: 'Clé utilisateur/groupe (laisser vide pour conserver la clé enregistrée)',
+        sendTest: 'Envoyer une notification de test', testSent: 'Notification de test envoyée.',
+        credentialsPresent: 'Identifiants enregistrés.', credentialsMissing: 'Identifiants incomplets.',
+        providerPaused: 'Envoi suspendu. Vérifiez la configuration et envoyez une notification de test ; consultez le journal du tableau de bord.',
+        historyHost: 'Hôte', historyRange: 'Période', historyHour: 'Dernière heure', historyDay: 'Dernières 24 heures',
+        historyWeek: '7 derniers jours', historyMonth: '30 derniers jours',
+        historyLoading: 'Chargement de l’historique …', historyNoHosts: 'Aucun hôte configuré.',
+        historyGaps: '{count} intervalles comportent des mesures manquantes. Les intervalles vides apparaissent comme des interruptions ; les intervalles partiels sont marqués par des cercles.',
+        historyComplete: 'Toutes les mesures sont présentes pour la période sélectionnée.',
+        historyIncomplete: 'Intervalle incomplet',
+        appearance: 'Apparence', fontSize: 'Taille du texte',
         small: 'Petite', medium: 'Moyenne', large: 'Grande', theme: 'Thème', dark: 'Sombre', light: 'Clair',
         telegram: 'Notifications Telegram', telegramEnabled: 'Activer Telegram', chatId: 'ID du chat',
         botToken: 'Jeton du bot (laisser vide pour conserver le jeton enregistré)', notifyEvents: 'Notifier pour',
@@ -943,7 +1086,8 @@
         setupRequired: 'Définissez d’abord le mot de passe localement sur l’hôte du tableau de bord.',
         saved: 'Enregistré.', requestFailed: 'Échec de la requête : {error}', passwordChanged: 'Mot de passe modifié. Reconnectez-vous.',
         monitoringTitle: 'Température et rapport quotidien', temperatureAlerts: 'Activer les alertes de température (toutes les 5 minutes)',
-        dailyReport: 'Activer le rapport quotidien à 12 h', threshold: 'Seuil de température (°C)'
+        dailyReport: 'Activer le rapport quotidien', dailyReportTime: 'Heure du rapport quotidien (fuseau horaire du tableau de bord)', threshold: 'Seuil de température (°C)',
+        unavailable: 'Indisponible', dockerUnavailable: 'Échec de la requête Docker'
       });
 
       const languageLocales = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR' };
@@ -1030,7 +1174,7 @@
         return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[type]}</svg>`;
       }
 
-      function linePath(values, maxValue, width, height, top = 5, bottom = 5) {
+      function linePath(values, maxValue, width, height, top = 5, bottom = 5, minValue = 0) {
         const usableHeight = height - top - bottom;
         const denominator = Math.max(values.length - 1, 1);
         let path = '';
@@ -1041,7 +1185,7 @@
             return;
           }
           const x = (index / denominator) * width;
-          const y = top + usableHeight - (Math.max(0, Math.min(Number(value), maxValue)) / maxValue) * usableHeight;
+          const y = top + usableHeight - ((Math.max(minValue, Math.min(Number(value), maxValue)) - minValue) / (maxValue - minValue)) * usableHeight;
           path += `${drawing ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)} `;
           drawing = true;
         });
@@ -1093,28 +1237,37 @@
         const plotWidth = width - left - right;
         const plotHeight = height - top - bottom;
         const maxValue = options.max || 100;
+        const minValue = options.min ?? 0;
         const ticks = options.ticks || [0, 25, 50, 75, 100];
         const count = Math.max(...series.map((item) => item.values.length), 0);
         const xAt = (index) => left + (index / Math.max(count - 1, 1)) * plotWidth;
-        const yAt = (value) => top + plotHeight - (value / maxValue) * plotHeight;
+        const yAt = (value) => top + plotHeight - ((value - minValue) / (maxValue - minValue)) * plotHeight;
         const grid = ticks.map((tick) => `
           <line class="chart-grid" x1="${left}" y1="${yAt(tick)}" x2="${width - right}" y2="${yAt(tick)}"></line>
           <text class="chart-label" x="${left - 7}" y="${yAt(tick) + 3}" text-anchor="end">${tick}${options.suffix || '%'}</text>
         `).join('');
         const labelIndexes = [...new Set([0, 0.25, 0.5, 0.75, 1].map((fraction) => Math.round((count - 1) * fraction)))];
         const xLabels = labelIndexes.map((index) => {
-          const time = chartHistory.times?.[index];
-          return time ? `<text class="chart-label" x="${xAt(index)}" y="${height - 5}" text-anchor="middle">${new Date(time).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })}</text>` : '';
+          const time = (options.times || chartHistory.times)?.[index];
+          const format = options.showDate ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' } : { hour: '2-digit', minute: '2-digit' };
+          return time ? `<text class="chart-label" x="${xAt(index)}" y="${height - 5}" text-anchor="middle">${new Date(time).toLocaleString(locale(), format)}</text>` : '';
         }).join('');
         const graphs = series.map((item) => {
           const values = Array(count - item.values.length).fill(null).concat(item.values);
-          const path = linePath(values, maxValue, plotWidth, plotHeight, 0, 0);
+          const path = linePath(values, maxValue, plotWidth, plotHeight, 0, 0, minValue);
           const shiftedPath = path.replace(/([ML])([\d.]+),([\d.]+)/g, (_, command, x, y) => `${command}${(Number(x) + left).toFixed(1)},${(Number(y) + top).toFixed(1)}`);
-          const currentValue = finite(item.values[item.values.length - 1]);
-          const marker = count === 1 && currentValue !== null
-            ? `<circle cx="${left}" cy="${yAt(Math.max(0, Math.min(currentValue, maxValue)))}" r="3" fill="${item.color}"></circle>`
-            : '';
-          return `<path class="chart-line" d="${shiftedPath}" stroke="${item.color}"></path>${marker}`;
+          const markers = values.map((value, index) => {
+            const number = finite(value);
+            return number !== null && finite(values[index - 1]) === null && finite(values[index + 1]) === null
+              ? `<circle cx="${xAt(index)}" cy="${yAt(Math.max(minValue, Math.min(number, maxValue)))}" r="3" fill="${item.color}"></circle>` : '';
+          }).join('');
+          const missing = item.incomplete || options.incomplete;
+          const gaps = missing ? values.map((value, index) => {
+            const number = finite(value);
+            return missing[index] && number !== null
+              ? `<circle cx="${xAt(index)}" cy="${yAt(Math.max(minValue, Math.min(number, maxValue)))}" r="3" fill="var(--surface-raised)" stroke="${item.color}"><title>${t('historyIncomplete')}</title></circle>` : '';
+          }).join('') : '';
+          return `<path class="chart-line" d="${shiftedPath}" stroke="${item.color}"></path>${markers}${gaps}`;
         }).join('');
 
         return `<section class="panel ${options.className || ''}">
@@ -1171,8 +1324,11 @@
         const rows = Object.entries(hosts).flatMap(([hostName, host]) =>
           (Array.isArray(host?.docker) ? host.docker : []).map((container) => ({ hostName, container }))
         );
-        if (!rows.length) return `<tr><td class="empty-row" colspan="5">${t('noContainers')}</td></tr>`;
-        return rows.map(({ hostName, container }) => {
+        const errors = Object.entries(hosts).filter(([, host]) => host?.online && host.docker_error).map(([name, host]) =>
+          `<tr><td colspan="5" class="empty-row">${escapeHtml(name)}: ${t('dockerUnavailable')} — ${escapeHtml(host.docker_error)}</td></tr>`
+        ).join('');
+        if (!rows.length) return errors || `<tr><td class="empty-row" colspan="5">${t('noContainers')}</td></tr>`;
+        return errors + rows.map(({ hostName, container }) => {
           const rawState = container.state || container.status || '';
           const running = rawState.toLowerCase().startsWith('running');
           const state = translations[currentLanguage][rawState.toLowerCase()] || rawState || t('unknown');
@@ -1198,16 +1354,17 @@
           if (!host.online) {
             return `<div class="security-host"><div class="security-host-name">${escapeHtml(name)}</div><span class="status-text bad">${t('hostUnreachable')}</span></div>`;
           }
-          const ufwStatus = ufw.active ? t('active') : t('inactive');
-          const failStatus = fail2ban.active ? t('active') : t('inactive');
+          const ufwStatus = ufw.active == null ? t('unavailable') : (ufw.active ? t('active') : t('inactive'));
+          const failStatus = fail2ban.active == null ? t('unavailable') : (fail2ban.active ? t('active') : t('inactive'));
           const ufwDetails = ufw.raw || t('noUfwOutput');
           const jailDetails = Array.isArray(fail2ban.jails) && fail2ban.jails.length
             ? fail2ban.jails.map((jail) => `${jail}\n${fail2ban.details?.[jail] || t('noDetailsAvailable')}`).join('\n\n')
-            : (fail2ban.raw || t('noActiveJails'));
+            : (fail2ban.raw || t(fail2ban.active == null ? 'unavailable' : 'noActiveJails'));
+          const failLabel = fail2ban.active == null ? 'Fail2Ban' : t('fail2banJails', { count: (fail2ban.jails || []).length });
           return `<div class="security-host" data-host="${escapeHtml(name)}">
             <div class="security-host-name">${escapeHtml(name)}</div>
             <div class="security-state-row"><span>${t('ufwFirewall')}</span><span class="status-text ${ufw.active ? '' : 'bad'}">${ufwStatus}</span></div>
-            <div class="security-state-row"><span>${t('fail2banJails', { count: (fail2ban.jails || []).length })}</span><span class="status-text ${fail2ban.active ? '' : 'bad'}">${failStatus}</span></div>
+            <div class="security-state-row"><span>${failLabel}</span><span class="status-text ${fail2ban.active ? '' : 'bad'}">${failStatus}</span></div>
             <details data-detail="ufw"><summary>${t('firewallRules')}</summary><div class="security-detail">${escapeHtml(ufwDetails)}</div></details>
             <details data-detail="fail2ban"><summary>${t('fail2banDetails')}</summary><div class="security-detail">${escapeHtml(jailDetails)}</div></details>
           </div>`;
@@ -1313,6 +1470,7 @@
           if (!data || typeof data !== 'object' || Array.isArray(data)) {
             throw new Error(t('invalidData'));
           }
+          updateHistoryHosts(data);
           renderDashboard(data);
           latestError = null;
           errorBanner.hidden = true;
@@ -1338,10 +1496,24 @@
         Object.values(chartHistory).forEach((history) => { history.length = 0; });
         document.querySelector('#app').replaceChildren();
         document.querySelector('#error-banner').hidden = true;
-        document.querySelector('#telegram-form').reset();
+        document.querySelectorAll('[data-provider-form]').forEach((form) => {
+          form.reset();
+          const message = form.querySelector('[role="status"]');
+          message.textContent = '';
+          delete message.dataset.providerPaused;
+          form.querySelector('[data-credential-status]').textContent = '';
+          delete form.dataset.credentialsPresent;
+        });
+        document.querySelector('#notification-provider').value = 'telegram';
+        showNotificationProvider();
         document.querySelector('#monitoring-form').reset();
         document.querySelector('#thresholds').replaceChildren();
         document.querySelector('#password-form').reset();
+        historyRequest += 1;
+        historyData = null;
+        document.querySelector('#history-host').replaceChildren();
+        document.querySelector('#history-charts').replaceChildren();
+        document.querySelector('#history-message').textContent = '';
         document.querySelector('#dashboard-header').hidden = true;
         document.querySelector('#dashboard-layout').hidden = true;
         document.querySelector('#login-screen').hidden = false;
@@ -1351,11 +1523,18 @@
 
       function applyView() {
         const view = location.hash.slice(1);
-        const current = ['hosts', 'containers', 'security', 'settings'].includes(view) ? view : 'overview';
+        const current = ['hosts', 'containers', 'security', 'history', 'notifications', 'settings'].includes(view) ? view : 'overview';
         document.querySelector('#app').dataset.current = current;
-        document.querySelector('#app').hidden = current === 'settings';
+        document.querySelector('#app').hidden = ['settings', 'notifications', 'history'].includes(current);
         document.querySelector('#settings-page').hidden = current !== 'settings';
-        document.querySelectorAll('.nav-link').forEach((link) => link.classList.toggle('active', link.hash === `#${current}`));
+        document.querySelector('#notifications-page').hidden = current !== 'notifications';
+        document.querySelector('#history-page').hidden = current !== 'history';
+        document.querySelectorAll('.nav-link').forEach((link) => {
+          const active = link.hash === `#${current}`;
+          link.classList.toggle('active', active);
+          if (active) link.setAttribute('aria-current', 'page');
+          else link.removeAttribute('aria-current');
+        });
       }
 
       async function api(path, method = 'GET', body) {
@@ -1371,6 +1550,61 @@
         return data;
       }
 
+      function updateHistoryHosts(hosts) {
+        const select = document.querySelector('#history-host');
+        const names = Object.keys(hosts);
+        const oldNames = [...select.options].map((option) => option.value);
+        if (names.length === oldNames.length && names.every((name, index) => name === oldNames[index])) return;
+        const previous = select.value;
+        select.replaceChildren(...names.map((name) => new Option(name, name)));
+        if (names.includes(previous)) select.value = previous;
+        if (location.hash === '#history') loadHistory();
+      }
+
+      function renderHistory(data) {
+        const points = data.points;
+        const incomplete = points.map((point) => !point.complete || Object.values(point.missing).some(Boolean));
+        const gaps = incomplete.filter(Boolean).length;
+        document.querySelector('#history-message').textContent = gaps
+          ? t('historyGaps', { count: gaps }) : t('historyComplete');
+        const times = points.map((point) => point.time * 1000);
+        const options = { times, incomplete, showDate: data.hours > 1 };
+        const temperature = points.map((point) => finite(point.temperature)).filter((value) => value !== null);
+        const min = Math.floor(Math.min(0, ...temperature) / 10) * 10;
+        const max = Math.ceil(Math.max(60, ...temperature) / 10) * 10;
+        const ticks = Array.from({ length: 5 }, (_, index) => min + (max - min) * index / 4);
+        document.querySelector('#history-charts').innerHTML = renderChart(t('systemResources'), [
+          { label: t('cpu'), color: colors.cpu, values: points.map((point) => point.cpu), incomplete: points.map((point) => point.missing.cpu) },
+          { label: t('ram'), color: colors.ram, values: points.map((point) => point.ram), incomplete: points.map((point) => point.missing.ram) },
+          { label: t('disk'), color: colors.disk, values: points.map((point) => point.disk), incomplete: points.map((point) => point.missing.disk) }
+        ], { ...options, className: 'resource-panel' }) + renderChart(t('temperatureTrend'), [
+          { label: t('temperature'), color: colors.temperature, values: points.map((point) => point.temperature), incomplete: points.map((point) => point.missing.temperature) }
+        ], { ...options, className: 'temperature-panel', min, max, ticks, suffix: '°' });
+      }
+
+      async function loadHistory() {
+        const request = ++historyRequest;
+        const host = document.querySelector('#history-host').value;
+        const message = document.querySelector('#history-message');
+        historyData = null;
+        document.querySelector('#history-charts').replaceChildren();
+        if (!host) {
+          message.textContent = t('historyNoHosts');
+          return;
+        }
+        message.textContent = t('historyLoading');
+        try {
+          const params = new URLSearchParams({ host, hours: document.querySelector('#history-range').value });
+          const data = await api(`/api/history?${params}`);
+          if (request !== historyRequest) return;
+          if (!Array.isArray(data.points)) throw new Error(t('invalidData'));
+          historyData = data;
+          renderHistory(data);
+        } catch (error) {
+          if (request === historyRequest) message.textContent = t('requestFailed', { error: error.message });
+        }
+      }
+
       async function loadTelegram() {
         const message = document.querySelector('#telegram-message');
         try {
@@ -1380,9 +1614,73 @@
           form.elements.chat_id.value = settings.chat_id;
           form.elements.token.value = '';
           form.querySelectorAll('[name="events"]').forEach((input) => { input.checked = settings.events.includes(input.value); });
+          setCredentialStatus(form, settings.token_configured && Boolean(settings.chat_id));
           message.textContent = '';
+          setProviderPause(message, settings.delivery_paused);
+          return true;
         } catch (error) {
           message.textContent = t('requestFailed', { error: error.message });
+          return false;
+        }
+      }
+
+      function setCredentialStatus(form, configured) {
+        form.dataset.credentialsPresent = String(Boolean(configured));
+        form.querySelector('[data-credential-status]').textContent = t(configured ? 'credentialsPresent' : 'credentialsMissing');
+      }
+
+      function setProviderPause(message, paused) {
+        if (paused) {
+          message.dataset.providerPaused = 'true';
+          message.textContent = t('providerPaused');
+        } else if (message.dataset.providerPaused) {
+          delete message.dataset.providerPaused;
+          message.textContent = '';
+        }
+      }
+
+      async function refreshProviderStatus() {
+        await Promise.all(['telegram', 'discord', 'ntfy', 'pushover'].map(async (provider) => {
+          const message = document.getElementById(`${provider}-message`);
+          try {
+            const path = provider === 'telegram' ? '/api/telegram' : `/api/notifications/${provider}`;
+            const settings = await api(path);
+            setProviderPause(message, settings.delivery_paused);
+          } catch (error) {
+            message.textContent = t('requestFailed', { error: error.message });
+          }
+        }));
+      }
+
+      function showNotificationProvider() {
+        const selected = document.querySelector('#notification-provider').value;
+        document.querySelectorAll('[data-provider-form]').forEach((form) => {
+          form.hidden = form.dataset.providerForm !== selected;
+        });
+      }
+
+      async function loadProvider(provider) {
+        const form = document.getElementById(`${provider}-form`);
+        const message = form.querySelector('[role="status"]');
+        try {
+          const settings = await api(`/api/notifications/${provider}`);
+          form.elements.enabled.checked = settings.enabled;
+          form.querySelectorAll('[name="events"]').forEach((input) => { input.checked = settings.events.includes(input.value); });
+          form.querySelectorAll('input[type="password"]').forEach((input) => { input.value = ''; });
+          if (provider === 'ntfy') {
+            form.elements.server_url.value = settings.server_url;
+            form.elements.clear_token.checked = false;
+          }
+          const configured = provider === 'discord' ? settings.webhook_configured
+            : provider === 'ntfy' ? settings.topic_configured && Boolean(settings.server_url)
+            : settings.token_configured && settings.user_key_configured;
+          setCredentialStatus(form, configured);
+          message.textContent = '';
+          setProviderPause(message, settings.delivery_paused);
+          return true;
+        } catch (error) {
+          message.textContent = t('requestFailed', { error: error.message });
+          return false;
         }
       }
 
@@ -1393,6 +1691,7 @@
           const form = document.querySelector('#monitoring-form');
           form.elements.temperature_enabled.checked = settings.temperature_enabled;
           form.elements.daily_report.checked = settings.daily_report;
+          form.elements.daily_report_time.value = settings.daily_report_time;
           const container = document.querySelector('#thresholds');
           container.replaceChildren();
           Object.entries(settings.thresholds).forEach(([name, value]) => {
@@ -1423,7 +1722,9 @@
         document.querySelector('#dashboard-header').hidden = false;
         document.querySelector('#dashboard-layout').hidden = false;
         applyView();
-        await Promise.all([loadDashboard(), loadTelegram(), loadMonitoring()]);
+        await Promise.all([loadDashboard(), loadTelegram(), loadMonitoring(),
+                           ...['discord', 'ntfy', 'pushover'].map(loadProvider)]);
+        if (authenticated && location.hash === '#history') await loadHistory();
       }
 
       document.querySelector('#login-form').addEventListener('submit', async (event) => {
@@ -1465,10 +1766,58 @@
             token: form.elements.token.value, events: [...form.querySelectorAll('[name="events"]:checked')].map((input) => input.value)
           });
           form.elements.token.value = '';
-          message.textContent = t('saved');
+          if (await loadTelegram() && !message.dataset.providerPaused) message.textContent = t('saved');
         } catch (error) {
           message.textContent = t('requestFailed', { error: error.message });
         }
+      });
+
+      document.querySelector('#notification-provider').addEventListener('change', showNotificationProvider);
+      document.querySelectorAll('[data-provider-form]:not(#telegram-form)').forEach((form) => {
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const provider = form.dataset.providerForm;
+          const message = form.querySelector('[role="status"]');
+          const payload = {
+            enabled: form.elements.enabled.checked,
+            events: [...form.querySelectorAll('[name="events"]:checked')].map((input) => input.value)
+          };
+          if (provider === 'discord') payload.webhook_url = form.elements.webhook_url.value;
+          if (provider === 'ntfy') {
+            payload.server_url = form.elements.server_url.value;
+            payload.topic = form.elements.topic.value;
+            payload.token = form.elements.token.value;
+            payload.clear_token = form.elements.clear_token.checked;
+          }
+          if (provider === 'pushover') {
+            payload.token = form.elements.token.value;
+            payload.user_key = form.elements.user_key.value;
+          }
+          try {
+            await api(`/api/notifications/${provider}`, 'PUT', payload);
+            form.querySelectorAll('input[type="password"]').forEach((input) => { input.value = ''; });
+            if (provider === 'ntfy') form.elements.clear_token.checked = false;
+            if (await loadProvider(provider) && !message.dataset.providerPaused) message.textContent = t('saved');
+          } catch (error) {
+            message.textContent = t('requestFailed', { error: error.message });
+          }
+        });
+      });
+      document.querySelectorAll('[data-test-provider]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const provider = button.dataset.testProvider;
+          const message = document.getElementById(`${provider}-message`);
+          button.disabled = true;
+          try {
+            await api(`/api/notifications/${provider}/test`, 'POST');
+            delete message.dataset.providerPaused;
+            message.textContent = t('testSent');
+          } catch (error) {
+            message.textContent = t('requestFailed', { error: error.message });
+          } finally {
+            button.disabled = false;
+          }
+        });
       });
 
       document.querySelector('#monitoring-form').addEventListener('submit', async (event) => {
@@ -1479,6 +1828,7 @@
           await api('/api/monitoring', 'PUT', {
             temperature_enabled: form.elements.temperature_enabled.checked,
             daily_report: form.elements.daily_report.checked,
+            daily_report_time: form.elements.daily_report_time.value,
             thresholds: Object.fromEntries([...form.querySelectorAll('[data-host]')].map((input) => [input.dataset.host, Number(input.value)]))
           });
           message.textContent = t('saved');
@@ -1502,11 +1852,15 @@
 
       window.addEventListener('hashchange', () => {
         applyView();
+        if (authenticated && location.hash === '#history') loadHistory();
+        if (authenticated && location.hash === '#notifications') refreshProviderStatus();
         document.querySelectorAll('#security details').forEach((detail) => {
           detail.open = location.hash === '#security';
           saveSecurityDetail(detail);
         });
       });
+      document.querySelector('#history-host').addEventListener('change', loadHistory);
+      document.querySelector('#history-range').addEventListener('change', loadHistory);
       function saveSecurityDetail(detail) {
         const key = JSON.stringify([detail.closest('[data-host]').dataset.host, detail.dataset.detail]);
         sessionStorage.setItem(`homelab-security:${location.hash || '#overview'}:${key}`, String(detail.open));
@@ -1519,6 +1873,14 @@
         currentLanguage = event.target.value;
         localStorage.setItem('homelab-dashboard-language', currentLanguage);
         applyTranslations();
+        document.querySelectorAll('[data-provider-form][data-credentials-present]').forEach((form) => {
+          setCredentialStatus(form, form.dataset.credentialsPresent === 'true');
+        });
+        document.querySelectorAll('[data-provider-paused]').forEach((message) => {
+          message.textContent = t('providerPaused');
+        });
+        if (historyData) renderHistory(historyData);
+        else if (!document.querySelector('#history-host').value) document.querySelector('#history-message').textContent = t('historyNoHosts');
         document.querySelectorAll('[data-threshold-host]').forEach((label) => {
           label.textContent = `${label.dataset.thresholdHost}: ${t('threshold')}`;
         });
@@ -1536,6 +1898,8 @@
         else showLogin(status.configured ? '' : t('setupRequired'));
       }).catch((error) => showLogin(t('requestFailed', { error: error.message })));
       setInterval(() => { if (authenticated) loadDashboard(); }, 15000);
+      setInterval(() => { if (authenticated && location.hash === '#history') loadHistory(); }, 60000);
+      setInterval(() => { if (authenticated && location.hash === '#notifications') refreshProviderStatus(); }, 15000);
     </script>
   </body>
 </html>
