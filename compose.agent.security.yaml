@@ -7,6 +7,8 @@ services:
     ports: !reset []
     cap_add:
       - NET_ADMIN
+    tmpfs:
+      - /run
     command:
       - uvicorn
       - agent:app
