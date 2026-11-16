@@ -10,7 +10,7 @@ services:
       - "${HOMELAB_BIND_ADDRESS:-127.0.0.1}:${HOMELAB_PORT:-8888}:8888"
     volumes:
       - type: bind
-        source: ./homelab-dashboard.config.py
+        source: "${HOMELAB_CONFIG_PATH:-./homelab-dashboard.config.py}"
         target: /etc/homelab-dashboard.py
         read_only: true
         bind:

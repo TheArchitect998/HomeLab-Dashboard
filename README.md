@@ -173,6 +173,13 @@ Edit `homelab-dashboard.config.py`: set the agent addresses and a strong
 The container runs as UID/GID 10001 and must be able to read it. Agent
 `127.0.0.1` addresses refer to the dashboard container itself.
 
+By default, Compose mounts `./homelab-dashboard.config.py` relative to the
+Compose project. Set `HOMELAB_CONFIG_PATH` to an absolute path on the Docker
+host to use a protected configuration file elsewhere, for example when
+deploying a Git stack through Dockhand and Hawser. The file must already
+exist, and UID/GID 10001 must be able to traverse its parent directories and
+read it. Do not commit the configuration file or its secrets.
+
 ```bash
 docker compose build
 docker compose run --rm dashboard python dashboard_api.py setup
