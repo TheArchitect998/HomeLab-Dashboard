@@ -236,19 +236,21 @@ that actually contains its `.journal` files and verify that the container can
 read them. Collection fails if the directory or journal files are unavailable.
 Journal access exposes sensitive logs.
 
-For UFW or Fail2Ban status, enable only the sources you need in a local copy of
-`compose.agent.yaml`; keep the existing service settings and mounts.
+For UFW status on Linux, `compose.agent.security.yaml` extends the standard
+agent configuration with host networking, `NET_ADMIN` and a read-only mount of
+host `/etc/ufw`. Select this file instead of `compose.agent.yaml`; it requires
+Docker Compose 2.24.4 or newer for `!reset`. The agent listens on
+`HOMELAB_AGENT_BIND_ADDRESS` and `HOMELAB_AGENT_PORT` directly on the host;
+the defaults are `127.0.0.1` and `9100`. Select a suitable host address and
+restrict access with the host firewall. `NET_ADMIN` allows changes to the host
+firewall; host networking and compatible UFW/iptables versions are required.
 
-For Fail2Ban status, set `HOMELAB_ENABLE_FAIL2BAN: "1"` and bind the host
-socket `/run/fail2ban/fail2ban.sock` to the same container path. Socket access
-allows administrative commands even with a read-only mount. The client in the
-image must be compatible with the host's Fail2Ban server.
-
-For UFW status on Linux, set `HOMELAB_ENABLE_UFW: "1"`, mount host `/etc/ufw`
-read-only at `/etc/ufw`, remove `ports`, and set `network_mode: host` and
-`cap_add: [NET_ADMIN]`. `NET_ADMIN` allows changes to the host firewall, and
-the agent listens on all host addresses on port 9100. Restrict access with the
-host firewall. Host networking and compatible UFW/iptables versions are required.
+To additionally enable Fail2Ban status with the security Compose file, set
+`HOMELAB_ENABLE_FAIL2BAN=1` on hosts running Fail2Ban. The agent connects to
+`/run/fail2ban/fail2ban.sock` through the existing host-root mount. Socket
+access allows administrative commands even with a read-only mount. The client
+in the image must be compatible with the host's Fail2Ban server. On hosts
+without Fail2Ban, leave the setting disabled.
 
 Recreate the container after changes and verify status and real events. Missing
 permissions or sources remain unavailable; the daily report marks missing

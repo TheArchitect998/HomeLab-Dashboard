@@ -779,6 +779,15 @@ class AgentEventTests(unittest.TestCase):
         self.assertEqual(containers, [])
         self.assertEqual(error, "permission denied")
 
+    def test_container_fail2ban_uses_configured_socket(self):
+        with patch.object(self.agent, "CONTAINER_MODE", True), \
+             patch.dict(os.environ, {"HOMELAB_ENABLE_FAIL2BAN": "1",
+                                     "HOMELAB_FAIL2BAN_SOCKET": "/host/root/run/fail2ban/fail2ban.sock"}), \
+             patch.object(self.agent, "run", return_value={"rc": 0, "out": "Status\n`- Jail list:"}) as run:
+            self.assertTrue(self.agent.fail2ban()["active"])
+            self.assertEqual(run.call_args.args[0],
+                             ["fail2ban-client", "-s", "/host/root/run/fail2ban/fail2ban.sock", "status"])
+
     def test_docker_event_includes_image_and_exit_code(self):
         event = {"timeNano": 101000000000, "Action": "die",
                  "Actor": {"Attributes": {"name": "dockhand", "image": "example/image:latest", "exitCode": "143"}}}
