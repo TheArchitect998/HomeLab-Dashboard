@@ -1,6 +1,9 @@
 # HomeLab Dashboard
 
-A lightweight, self-hosted monitoring dashboard for your home lab. Monitor multiple devices (Raspberry Pi, mini PCs, NAS, etc.) from a single web interface. Track CPU, RAM, disk usage, temperature, and service status with an easy-to-use dashboard.
+HomeLab Dashboard is a self-hosted monitoring dashboard for Linux hosts. It
+provides system metrics, Docker and security information, persistent history,
+and notifications via Telegram, Discord, Ntfy and Pushover. Temperature alerts
+and a daily report with a configurable time help you monitor your homelab.
 
 **Perfect for:** Home labs, small server farms, personal infrastructure monitoring.
 
