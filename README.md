@@ -2,7 +2,8 @@
 
 HomeLab Dashboard is a self-hosted monitoring dashboard for Linux hosts. It
 provides system metrics, Docker and security information, persistent history,
-and notifications via Telegram, Discord, Ntfy and Pushover. Temperature alerts
+and notifications via Telegram, Discord, Ntfy, Pushover, e-mail (SMTP), generic
+webhooks and Gotify. Temperature alerts
 and a daily report with a configurable time help you monitor your homelab.
 
 **Perfect for:** Home labs, small server farms, personal infrastructure monitoring.
@@ -37,9 +38,10 @@ The screenshot uses synthetic example data.
 
 - CPU, RAM, root filesystem and temperature monitoring
 - Persistent per-host metrics history: one sample per minute, retained for 30 days
-- Docker container status, start times and restarts
+- Docker container status, start times and restarts, plus CPU, RAM and network per container with history
+- Reachability checks (HTTP, TCP, ping, DNS) with outage notifications
 - UFW and Fail2Ban status where configured
-- Telegram, Discord, Ntfy and Pushover notifications
+- Telegram, Discord, Ntfy, Pushover, e-mail (SMTP), webhook and Gotify notifications
 - Per-host temperature alerts and a daily report with a configurable time
 - Password-protected dashboard and optional agent authentication
 - German, English and French interface; light and dark themes
@@ -210,8 +212,14 @@ docker compose -f compose.agent.yaml up -d --build
 ```
 
 Set `HOMELAB_AGENT_BIND_ADDRESS` to a suitable LAN IP for remote dashboard
-access and restrict port 9100 with the host firewall. Agent communication is
-unencrypted; use a trusted network or encrypted tunnel.
+access and restrict port 9100 with the host firewall. Without TLS, agent
+communication is unencrypted; enable HTTPS (see
+[Encrypted agent communication](#encrypted-agent-communication)) or use an
+encrypted tunnel.
+
+The agent refuses to start without `HOMELAB_AGENT_KEY` of at least 16
+characters (the example value `change-me` is rejected). Generate one with
+`python3 -c "import secrets; print(secrets.token_urlsafe(32))"`.
 
 The agent reads host metrics and Docker status. Journal event collection and
 UFW and Fail2Ban status checks are disabled by default. Unavailable sources are
@@ -236,6 +244,12 @@ that actually contains its `.journal` files and verify that the container can
 read them. Collection fails if the directory or journal files are unavailable.
 Journal access exposes sensitive logs.
 
+For everything at once (HTTPS, journal, UFW, Fail2Ban, S.M.A.R.T., Docker),
+use the standalone `compose.agent.full.yaml` instead of the other agent files:
+`docker compose -f compose.agent.full.yaml up -d --build`. It requires
+`HOMELAB_AGENT_KEY`, `HOMELAB_AGENT_TLS_DIR` and `HOMELAB_JOURNAL_DIR`; the
+header of the file lists all optional variables.
+
 For UFW status on Linux, `compose.agent.security.yaml` extends the standard
 agent configuration with host networking, `NET_ADMIN` and a read-only mount of
 host `/etc/ufw`. Select this file instead of `compose.agent.yaml`; it requires
@@ -255,6 +269,28 @@ without Fail2Ban, leave the setting disabled.
 Recreate the container after changes and verify status and real events. Missing
 permissions or sources remain unavailable; the daily report marks missing
 event coverage as incomplete.
+
+#### Hardware metrics
+
+Swap, disk I/O, per-interface network rates, NVIDIA GPU (`nvidia-smi`), ZFS pools
+(`zpool`) and battery are reported automatically when available; the dashboard
+shows "Unavailable" with the reason (tooltip) otherwise. Rates are computed from
+counter deltas between requests; loopback, `veth*`, `docker*` and `br-*`
+interfaces are ignored. In the container agent, network counters describe the
+container's namespace unless host networking is used (`compose.agent.security.yaml`),
+and GPU/ZFS tools are not part of the image. Intel/AMD GPUs are not supported.
+
+S.M.A.R.T. is opt-in (`HOMELAB_ENABLE_SMART=1`) because it needs raw disk access.
+Results are cached for 10 minutes and standby disks are not woken (`-n standby`).
+A failed health check, reallocated/pending/uncorrectable sectors, or an NVMe
+critical warning or media errors are shown as a warning. Not every USB adapter
+passes SMART commands through.
+
+- Native: install `smartmontools`, enable the commented `HOMELAB_SMART` lines in
+  `systemd/homelab-dashboard.sudoers` and set `HOMELAB_ENABLE_SMART=1` in
+  `/etc/homelab-agent.env`.
+- Docker Compose: add `-f compose.agent.smart.yaml` after editing its device list;
+  it adds `SYS_RAWIO` and maps the disks.
 
 To build and publish multi-architecture images to your own registry, use
 `docker buildx build --platform linux/arm64,linux/amd64` with the appropriate
@@ -489,15 +525,55 @@ sudo systemctl restart homelab-dashboard.service
 
 ### Notifications, temperature alerts and daily report
 
-Under **Notifications**, select Telegram, Discord, Ntfy or Pushover and
+Under **Notifications**, select Telegram, Discord, Ntfy, Pushover, E-Mail (SMTP),
+Webhook or Gotify and
 configure the provider. Multiple providers can be enabled at the same time.
 Use the test button to verify delivery. Stored credentials are not displayed;
 leaving a secret field empty retains the saved value.
+
+- **E-Mail (SMTP)**: server, port, encryption (STARTTLS, SSL/TLS or none), optional
+  login, sender and one or more recipients (comma separated). Certificates are
+  verified.
+- **Webhook**: the dashboard sends `POST` with JSON
+  `{"source": "homelab-dashboard", "message": "...", "text": "..."}` to your URL
+  (`text` is included for Slack/Mattermost-style receivers). An optional token is
+  sent as `Authorization: Bearer <token>`.
+- **Gotify**: server URL and an application token.
 
 Enable temperature alerts and/or the daily report under **Temperature and
 daily report**. At least one provider must be enabled. Temperature thresholds
 are configured per host. Alerts repeat every five minutes while the threshold
 is exceeded; a recovery message follows when the temperature returns to normal.
+
+Optionally enable **hardware alerts** in the same form. They require
+S.M.A.R.T. (`HOMELAB_ENABLE_SMART=1`) and/or ZFS data from the agent and are off
+by default. Hosts are checked every five minutes. A notification is sent when
+the list of problems changes (failed health check, reallocated/pending/
+uncorrectable sectors, NVMe warnings, ZFS pool not `ONLINE`), and again when all
+problems are resolved. Unchanged problems are not repeated.
+
+### Container metrics and reachability checks
+
+The agent reports CPU, RAM and network rates per container (`docker stats`,
+sampled at most every 30 seconds) next to the container list. The network rates
+are derived from the totals reported by Docker, so they are approximate for
+very low traffic. The dashboard stores these values once a minute for 30 days;
+the **History** page shows per-container charts. The metrics need the same
+Docker access as the container list.
+
+Open **Reachability** to add checks that run every minute **from the dashboard**:
+
+| Type | Target | Success |
+| --- | --- | --- |
+| HTTP | URL | status below 400 (redirects are followed, certificates verified) |
+| TCP | host and port | connection established |
+| Ping | host or IP | ICMP reply (the Docker image includes `ping`; for a native install, `ping` must be installed) |
+| DNS | host name | name resolves |
+
+After two failed runs in a row a check counts as down and a notification is
+sent to all enabled providers (per check, switchable); another message follows
+when the check recovers. Check state is shown live; outages are not stored as
+history.
 
 Choose the report time in the dashboard. The default is 12:00 in the
 dashboard process's timezone. The report is sent once per host and provider
@@ -591,6 +667,96 @@ No code changes needed—just restart the dashboard.
 - ✅ **Firewall rules** to limit dashboard/agent access
 - ✅ **Keep the state directory private**: it contains the password hash, Telegram token and monitoring data
 - ✅ **Use HTTPS for network access**, not only internet access; plain HTTP exposes login credentials and cookies
+
+### Encrypted agent communication
+
+Every agent request is authenticated with the `X-Agent-Key` header (compared in
+constant time; the agent rejects missing, short or example keys). Without TLS
+the key and metrics travel in clear text, so enable HTTPS on agents outside
+`127.0.0.1`.
+
+1. Create a certificate on the agent host (replace the name/IP with the address
+   the dashboard uses):
+
+   ```bash
+   openssl req -x509 -newkey rsa:4096 -nodes -days 825 \
+     -keyout agent.key -out agent.crt -subj "/CN=homelab1.lan" \
+     -addext "subjectAltName=DNS:homelab1.lan,IP:192.168.1.20"
+   chmod 600 agent.key
+   ```
+
+2. Start the agent with TLS. Native: set `UVICORN_SSL_CERTFILE` and
+   `UVICORN_SSL_KEYFILE` in `/etc/homelab-agent.env`. Docker Compose: add
+   `-f compose.agent.tls.yaml` and set `HOMELAB_AGENT_TLS_DIR` to the directory
+   containing `agent.crt` and `agent.key`.
+3. Copy `agent.crt` (not the key) to the dashboard host and use an `https://`
+   URL. With a config file, pin the certificate per agent:
+
+   ```python
+   AGENTS = {"HomeLab1": {"url": "https://homelab1.lan:9100",
+                          "ca_cert": "/opt/homelab-dashboard/certs/homelab1.crt"}}
+   ```
+
+   With `AGENT_URLS`, set `AGENT_CA_CERT` to the certificate path. Certificates
+   are always verified; there is no option to disable verification.
+
+### Per-agent keys
+
+Prefer a different key per agent so a leaked key only affects one host. In the
+config file, add `"key"` to the agent entry; agents without it use `AGENT_KEY`.
+To register a new agent, generate its key, set it as `HOMELAB_AGENT_KEY` on the
+agent and as `"key"` in the dashboard config entry.
+
+```python
+AGENTS = {"HomeLab1": {"url": "https://homelab1.lan:9100", "key": "unique-key-for-homelab1"}}
+```
+
+### Agent permissions
+
+| Capability | Needed for | Default |
+| --- | --- | --- |
+| Read-only `/proc` and `/` mounts | CPU, RAM, storage | On |
+| Docker socket (root-equivalent) | Container status and events | On; remove the mount if not needed (Docker data is then shown as unavailable) |
+| `HOMELAB_JOURNAL_DIR` | SSH and Fail2Ban events | Off |
+| `compose.agent.security.yaml` (`NET_ADMIN`, host network, `/etc/ufw`) | UFW status | Off |
+| `HOMELAB_ENABLE_FAIL2BAN=1` | Fail2Ban status | Off |
+
+All capabilities are dropped except those listed, the root filesystem is
+read-only and `no-new-privileges` is set. Enable only the sources you need.
+
+### HTTPS for the dashboard behind a reverse proxy
+
+Run the dashboard on `127.0.0.1` (default `HOMELAB_BIND_ADDRESS`) and let the
+proxy terminate TLS. Start Uvicorn with `--proxy-headers
+--forwarded-allow-ips PROXY-IP` so session cookies are marked `Secure`.
+
+Caddy (automatic certificates):
+
+```caddyfile
+homelab.example.com {
+    reverse_proxy 127.0.0.1:8888
+}
+```
+
+nginx:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name homelab.example.com;
+    ssl_certificate     /etc/ssl/homelab.crt;
+    ssl_certificate_key /etc/ssl/homelab.key;
+    location / {
+        proxy_pass http://127.0.0.1:8888;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Traefik: route to `http://127.0.0.1:8888` with a TLS router and the
+`X-Forwarded-Proto` header (set by default).
 
 **Example: Firewall rules to restrict agent access**
 

@@ -61,9 +61,45 @@ class DashboardTests(unittest.TestCase):
             self.assertEqual(module["cfg"].AGENTS, {"agent-1": {"url": "http://one:9100"},
                                                    "agent-2": {"url": "http://two:9100"}})
             self.assertEqual(module["cfg"].AGENT_KEY, "test-key")
+            with patch.dict(os.environ, {**variables, "AGENT_CA_CERT": "/certs/ca.pem"}, clear=True):
+                module = runpy.run_path(str(ROOT.parent / "dashboard_api.py"), run_name="public_config_test")
+            self.assertEqual(module["cfg"].AGENTS["agent-1"]["ca_cert"], "/certs/ca.pem")
             with patch.dict(os.environ, {"AGENT_URLS": "invalid"}, clear=True):
                 with self.assertRaisesRegex(RuntimeError, "AGENT_URLS"):
                     runpy.run_path(str(ROOT.parent / "dashboard_api.py"), run_name="public_config_test")
+
+    def test_agent_requests_use_per_agent_key_and_pinned_ca(self):
+        import asyncio
+        seen = []
+        def handler(request):
+            seen.append(request.headers.get("X-Agent-Key"))
+            return httpx.Response(200, json={})
+        factory = httpx.AsyncClient
+        verify = []
+        def make_client(**kwargs):
+            verify.append(kwargs.get("verify"))
+            return factory(transport=httpx.MockTransport(handler), **kwargs)
+        async def run():
+            with patch.object(self.dashboard.cfg, "AGENT_KEY", "shared-key", create=True), \
+                 patch.object(self.dashboard.httpx, "AsyncClient", side_effect=make_client):
+                await self.dashboard.agent_get({"url": "https://a.test"}, "/api/metrics")
+                await self.dashboard.agent_get({"url": "https://b.test", "key": "own-key", "ca_cert": "/ca.pem"}, "/api/metrics")
+        asyncio.run(run())
+        self.assertEqual(seen, ["shared-key", "own-key"])
+        self.assertEqual(verify, [True, "/ca.pem"])
+
+    def test_agent_requires_strong_key_and_rejects_wrong_key(self):
+        agent_path = ROOT / "agent.py"
+        for key in ("", "change-me", "short", " " + "k" * 20):
+            with patch.dict(os.environ, {"HOMELAB_AGENT_KEY": key}):
+                with self.assertRaisesRegex(RuntimeError, "HOMELAB_AGENT_KEY"):
+                    load_module("agent_test", agent_path)
+        with patch.dict(os.environ, {"HOMELAB_AGENT_KEY": "k" * 20}):
+            agent = load_module("agent_test", agent_path)
+        client = TestClient(agent.app)
+        self.assertEqual(client.get("/api/health").status_code, 401)
+        self.assertEqual(client.get("/api/health", headers={"X-Agent-Key": "x" * 20}).status_code, 401)
+        self.assertEqual(client.get("/api/health", headers={"X-Agent-Key": "k" * 20}).status_code, 200)
 
     def test_dashboard_serves_frontend_from_repository(self):
         response = self.client.get("/")
@@ -409,6 +445,151 @@ class DashboardTests(unittest.TestCase):
         event["exit_code"] = "137"
         self.assertIn("❌ dockhand stopped!", self.dashboard.notification_text("host", event))
 
+    def test_hardware_alerts_notify_on_change_only(self):
+        import asyncio
+        messages = []
+        metrics = [{"smart": {"available": True, "disks": [{"device": "/dev/sda", "available": True, "model": "X", "problems": []}]},
+                    "zfs": {"available": True, "pools": [{"name": "tank", "health": "ONLINE"}]}}]
+        def handler(request):
+            if request.url.host == "agent.test":
+                return httpx.Response(200, json=metrics[0])
+            messages.append(json.loads(request.content)["text"])
+            return httpx.Response(200, json={"ok": True})
+
+        async def run():
+            db = self.dashboard.open_monitoring_db()
+            providers = {"telegram": {"token": "123:abc", "chat_id": "1"}}
+            self.dashboard.hardware_checked.clear()
+            with patch.object(self.dashboard.cfg, "AGENTS", {"host": {"url": "http://agent.test"}}):
+                async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+                    collect = lambda now: self.dashboard.collect_hardware_alerts(client, db, {}, now, providers)
+                    await collect(1000)
+                    self.assertEqual(messages, [])
+                    metrics[0]["smart"]["disks"][0]["problems"] = ["8 reallocated sectors"]
+                    metrics[0]["zfs"]["pools"][0]["health"] = "DEGRADED"
+                    await collect(1100)
+                    await collect(1400)
+                    self.assertEqual(len(messages), 1)
+                    self.assertIn("8 reallocated sectors", messages[0])
+                    self.assertIn("ZFS tank: DEGRADED", messages[0])
+                    metrics[0] = {"smart": {"available": False}}
+                    await collect(1700)
+                    self.assertEqual(len(messages), 1)
+                    metrics[0] = {"smart": {"available": True, "disks": []}}
+                    await collect(2000)
+                    self.assertEqual(len(messages), 2)
+                    self.assertIn("✅", messages[1])
+            db.close()
+        asyncio.run(run())
+
+    def test_new_notification_providers_validate_and_deliver(self):
+        import asyncio
+        self.login()
+        base = {"enabled": True, "events": []}
+        bad = [("email", {"host": "mail.test", "sender": "bad", "recipient": "a@b.test"}),
+               ("email", {"host": "mail.test", "sender": "a@b.test", "recipient": "x@y.test", "port": 0}),
+               ("webhook", {"webhook_url": "ftp://x"}), ("gotify", {"server_url": "https://g.test", "token": "bad token"})]
+        for provider, extra in bad:
+            response = self.client.put(f"/api/notifications/{provider}", json={**base, **extra}, headers=self.headers)
+            self.assertEqual(response.status_code, 400, (provider, extra))
+        for provider, extra in [("email", {"host": "mail.test", "sender": "a@b.test", "recipient": "x@y.test, z@y.test",
+                                          "username": "u", "password": "secret"}),
+                                ("webhook", {"webhook_url": "https://hooks.test/in?id=1", "token": "tok"}),
+                                ("gotify", {"server_url": "https://g.test/", "token": "apptoken"})]:
+            response = self.client.put(f"/api/notifications/{provider}", json={**base, **extra}, headers=self.headers)
+            self.assertEqual(response.status_code, 200, response.text)
+        saved = self.client.get("/api/notifications/email").json()
+        self.assertTrue(saved["password_configured"])
+        self.assertNotIn("secret", json.dumps(saved))
+        self.assertEqual(saved["recipient"], "x@y.test, z@y.test")
+        self.assertEqual(self.client.get("/api/notifications/gotify").json()["server_url"], "https://g.test")
+        requests = []
+        def handler(request):
+            requests.append(request)
+            return httpx.Response(200, json={})
+        providers = self.dashboard.enabled_providers(self.dashboard.read_settings())
+        async def run():
+            async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+                for name in ("webhook", "gotify"):
+                    await self.dashboard.deliver_notification(client, name, providers[name], "hello")
+        asyncio.run(run())
+        self.assertEqual(requests[0].headers["Authorization"], "Bearer tok")
+        self.assertEqual(json.loads(requests[0].content)["message"], "hello")
+        self.assertEqual(str(requests[1].url), "https://g.test/message")
+        self.assertEqual(requests[1].headers["X-Gotify-Key"], "apptoken")
+        with patch.object(self.dashboard.smtplib, "SMTP") as smtp:
+            smtp.return_value.__enter__.return_value = smtp.return_value
+            self.dashboard.send_email(providers["email"], "⚠️ Alarm\nDetails")
+        server = smtp.return_value
+        server.starttls.assert_called_once()
+        server.login.assert_called_once_with("u", "secret")
+        mail = server.send_message.call_args.args[0]
+        self.assertEqual((mail["To"], mail["Subject"]), ("x@y.test, z@y.test", "HomeLab Dashboard: ⚠️ Alarm"))
+
+    def test_checks_api_validation(self):
+        self.login()
+        put = lambda checks: self.client.put("/api/checks", json={"checks": checks}, headers=self.headers)
+        self.assertEqual(put([{"name": "a", "type": "tcp", "target": "host.test"}]).status_code, 400)
+        self.assertEqual(put([{"name": "a", "type": "ping", "target": "-c 5 host"}]).status_code, 400)
+        self.assertEqual(put([{"name": "a", "type": "http", "target": "file:///etc"}]).status_code, 400)
+        self.assertEqual(put([{"name": "a", "type": "dns", "target": "x.test"}] * 2).status_code, 400)
+        self.assertEqual(put([{"name": "web", "type": "tcp", "target": "host.test", "port": 443}]).status_code, 200)
+        self.assertEqual(self.client.get("/api/checks").json()["checks"][0]["port"], 443)
+
+    def test_check_failures_notify_after_threshold_and_on_recovery(self):
+        import asyncio
+        messages = []
+        results = [(True, 5, None)]
+        async def runner(check):
+            return results[0]
+        def handler(request):
+            messages.append(json.loads(request.content)["text"])
+            return httpx.Response(200, json={"ok": True})
+        checks = [{"name": "web", "type": "tcp", "target": "host.test", "port": 80, "notify": True}]
+        async def run():
+            db = self.dashboard.open_monitoring_db()
+            self.dashboard.check_status.clear()
+            self.dashboard.check_failures.clear()
+            providers = {"telegram": {"token": "123:abc", "chat_id": "1"}}
+            async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+                evaluate = lambda: self.dashboard.evaluate_checks(client, db, providers, checks, 1000, runner)
+                await evaluate()
+                results[0] = (False, None, "Timeout")
+                await evaluate()
+                self.assertEqual(messages, [])
+                self.assertFalse(self.dashboard.check_status["web"]["down"])
+                await evaluate()
+                await evaluate()
+                self.assertEqual(len(messages), 1)
+                self.assertIn("web", messages[0])
+                results[0] = (True, 3, None)
+                await evaluate()
+                await evaluate()
+                self.assertEqual(len(messages), 2)
+                self.assertIn("🟢", messages[1])
+                await self.dashboard.evaluate_checks(client, db, providers, [], 1000, runner)
+                self.assertEqual(self.dashboard.check_status, {})
+            db.close()
+        asyncio.run(run())
+
+    def test_container_history_is_collected_and_bucketed(self):
+        import asyncio, time
+        self.login()
+        data = {"online": True, "cpu_percent": 1, "ram_percent": 2, "storage_percent": 3, "temperature_c": None,
+                "docker_stats": {"available": True, "containers": [
+                    {"name": "web", "cpu_percent": 10.0, "ram_percent": 20.0, "net_rx_bytes_per_s": 100.0, "net_tx_bytes_per_s": None},
+                    {"name": "bad", "cpu_percent": float("nan")}]}}
+        async def fake_fetch(name, item):
+            return name, data
+        with patch.object(self.dashboard.cfg, "AGENTS", {"host": {"url": "http://agent.test"}}), \
+             patch.object(self.dashboard, "fetch", side_effect=fake_fetch):
+            asyncio.run(self.dashboard.collect_history(time.time()))
+            response = self.client.get("/api/history/containers", params={"host": "host", "hours": 1})
+        self.assertEqual(response.status_code, 200)
+        point = response.json()["containers"]["web"][0]
+        self.assertEqual((point["cpu"], point["ram"], point["rx"], point["tx"]), (10.0, 20.0, 100.0, None))
+        self.assertIsNone(response.json()["containers"]["bad"][0]["cpu"])
+
     def test_temperature_transition_reminders_and_report(self):
         import asyncio
         messages = []
@@ -668,8 +849,9 @@ class DashboardTests(unittest.TestCase):
 class AgentEventTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.agent = load_module("agent_test", ROOT / "agent.py")
-        cls.client = TestClient(cls.agent.app)
+        with patch.dict(os.environ, {"HOMELAB_AGENT_KEY": "test-agent-key-0123456789"}):
+            cls.agent = load_module("agent_test", ROOT / "agent.py")
+        cls.client = TestClient(cls.agent.app, headers={"X-Agent-Key": "test-agent-key-0123456789"})
 
     def test_event_filtering_and_half_open_interval(self):
         journal = [
@@ -732,6 +914,53 @@ class AgentEventTests(unittest.TestCase):
             result = self.client.get("/api/events", params={"since": 199, "until": 201, "types": "ssh_login"}).json()["events"][0]
         self.assertEqual(result["user"], "alice")
         self.assertIsNone(result["remote_ip"])
+
+    def test_smart_reports_failures_and_disabled_state(self):
+        self.assertFalse(self.agent.smart()["available"])
+        scan = json.dumps({"devices": [{"name": "/dev/sda", "type": "sat"}, {"name": "/dev/nvme0", "type": "nvme"},
+                                       {"name": "/dev/sdb; rm", "type": "sat"}]})
+        ata = json.dumps({"model_name": "Disk A", "smart_status": {"passed": True},
+                          "temperature": {"current": 35}, "power_on_time": {"hours": 100},
+                          "ata_smart_attributes": {"table": [{"id": 5, "raw": {"value": 8}}, {"id": 197, "raw": {"value": 0}}]}})
+        nvme = json.dumps({"model_name": "Disk B", "smart_status": {"passed": False},
+                           "nvme_smart_health_information_log": {"critical_warning": 1, "percentage_used": 3}})
+        def fake_run(command, timeout=5):
+            if "--scan" in command:
+                return {"rc": 0, "out": scan}
+            return {"rc": 4, "out": ata if "/dev/sda" in command else nvme}
+        with patch.dict(os.environ, {"HOMELAB_ENABLE_SMART": "1"}), patch.object(self.agent, "run", side_effect=fake_run):
+            result = self.agent.smart()
+        self.assertEqual([disk["device"] for disk in result["disks"]], ["/dev/sda", "/dev/nvme0"])
+        self.assertEqual(result["disks"][0]["problems"], ["8 reallocated sectors"])
+        self.assertEqual(result["disks"][1]["problems"], ["SMART health check failed", "NVMe critical warning"])
+
+    def test_io_rates_use_counter_deltas_and_skip_virtual_interfaces(self):
+        from collections import namedtuple
+        Disk = namedtuple("Disk", "read_bytes write_bytes")
+        Net = namedtuple("Net", "bytes_recv bytes_sent")
+        samples = iter([(10.0, Disk(0, 0), {"eth0": Net(0, 0), "lo": Net(0, 0), "veth1": Net(0, 0)}),
+                        (12.0, Disk(2000, 400), {"eth0": Net(1000, 200), "lo": Net(5, 5), "veth1": Net(9, 9)})])
+        with patch.object(self.agent, "_io_state", {"time": None, "disk": None, "net": None, "rates": None}), \
+             patch.object(self.agent, "sample_io", side_effect=lambda: next(samples)), \
+             patch.object(self.agent.time, "sleep"):
+            rates = self.agent.io_rates()
+        self.assertEqual(rates["disk_io"], {"read_bytes_per_s": 1000, "write_bytes_per_s": 200})
+        self.assertEqual(rates["network"], [{"name": "eth0", "rx_bytes_per_s": 500, "tx_bytes_per_s": 100}])
+
+    def test_container_stats_parse_units_and_network_rates(self):
+        def output(received, sent):
+            return {"rc": 0, "out": json.dumps({"Name": "web", "CPUPerc": "12.50%", "MemPerc": "3.00%",
+                                                "MemUsage": "100MiB / 2GiB", "NetIO": f"{received} / {sent}"})}
+        clock = iter([100.0, 110.0])
+        with patch.object(self.agent, "_container_net", {}), patch.object(self.agent.time, "monotonic", side_effect=lambda: next(clock)), \
+             patch.object(self.agent, "run", side_effect=[output("1kB", "2kB"), output("11kB", "7kB")]):
+            first = self.agent.container_stats()["containers"][0]
+            second = self.agent.container_stats()["containers"][0]
+        self.assertEqual((first["cpu_percent"], first["ram_percent"], first["ram_bytes"]), (12.5, 3.0, 100 * 1024**2))
+        self.assertIsNone(first["net_rx_bytes_per_s"])
+        self.assertEqual((second["net_rx_bytes_per_s"], second["net_tx_bytes_per_s"]), (1000, 500))
+        with patch.object(self.agent, "run", return_value={"rc": 1, "out": "no docker"}):
+            self.assertFalse(self.agent.container_stats()["available"])
 
     def test_event_api_requires_configured_key(self):
         with patch.object(self.agent, "KEY", "agent-secret"):

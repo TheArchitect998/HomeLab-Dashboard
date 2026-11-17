@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /opt/homelab-agent
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends docker-cli systemd ufw fail2ban \
+    && apt-get install -y --no-install-recommends docker-cli systemd ufw fail2ban smartmontools \
     && rm -rf /var/lib/apt/lists/*
 COPY backend/requirements-agent.txt .
 RUN pip install --no-cache-dir -r requirements-agent.txt

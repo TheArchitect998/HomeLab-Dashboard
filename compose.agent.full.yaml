@@ -1,0 +1,86 @@
+# Full-featured agent: HTTPS, journal (SSH/Fail2Ban events), UFW, Fail2Ban,
+# S.M.A.R.T., Docker and host networking in one file. Use it INSTEAD of the other
+# agent Compose files:
+#   docker compose -f compose.agent.full.yaml up -d --build
+#
+# Required variables (e.g. in .env):
+#   HOMELAB_AGENT_KEY         at least 16 random characters
+#   HOMELAB_AGENT_TLS_DIR     directory with agent.crt and agent.key
+#   HOMELAB_JOURNAL_DIR       journal directory as seen in the container, e.g.
+#                             /host/root/var/log/journal/<machine-id>
+# Optional variables:
+#   HOMELAB_AGENT_BIND_ADDRESS (default 127.0.0.1), HOMELAB_AGENT_PORT (9100)
+#   HOMELAB_ENABLE_UFW (1), HOMELAB_ENABLE_FAIL2BAN (1), HOMELAB_ENABLE_SMART (1)
+#   HOMELAB_SMART_DEVICE      disk to read S.M.A.R.T. from (default /dev/sda);
+#                             the device must exist on the host
+# Security notes: NET_ADMIN allows firewall changes, SYS_RAWIO allows raw disk
+# commands, the Docker socket is effectively host root, and the journal and the
+# Fail2Ban socket expose sensitive data. Disable what you do not need.
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    image: homelab-agent:local
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - uvicorn
+      - agent:app
+      - --host
+      - "${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}"
+      - --port
+      - "${HOMELAB_AGENT_PORT:-9100}"
+    environment:
+      HOMELAB_AGENT_KEY: "${HOMELAB_AGENT_KEY:?Set HOMELAB_AGENT_KEY before starting the agent}"
+      HOMELAB_JOURNAL_DIR: "${HOMELAB_JOURNAL_DIR:?Set HOMELAB_JOURNAL_DIR, e.g. /host/root/var/log/journal/<machine-id>}"
+      HOMELAB_ENABLE_UFW: "${HOMELAB_ENABLE_UFW:-1}"
+      HOMELAB_ENABLE_FAIL2BAN: "${HOMELAB_ENABLE_FAIL2BAN:-1}"
+      HOMELAB_FAIL2BAN_SOCKET: /host/root/run/fail2ban/fail2ban.sock
+      HOMELAB_ENABLE_SMART: "${HOMELAB_ENABLE_SMART:-1}"
+      UVICORN_SSL_CERTFILE: /tls/agent.crt
+      UVICORN_SSL_KEYFILE: /tls/agent.key
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+      - SYS_RAWIO
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    devices:
+      - "${HOMELAB_SMART_DEVICE:-/dev/sda}:${HOMELAB_SMART_DEVICE:-/dev/sda}"
+    volumes:
+      - type: bind
+        source: /proc
+        target: /host/proc
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /
+        target: /host/root
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/ufw
+        target: /etc/ufw
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${HOMELAB_AGENT_TLS_DIR:?Set HOMELAB_AGENT_TLS_DIR to the directory with agent.crt and agent.key}"
+        target: /tls
+        read_only: true
+        bind:
+          create_host_path: false

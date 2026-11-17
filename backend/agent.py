@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import ipaddress, json, os, platform, re, shutil, socket, subprocess, time
+import hmac, ipaddress, json, os, platform, re, shutil, socket, subprocess, threading, time
 from datetime import datetime, timezone
 from typing import Any
 import psutil
@@ -8,9 +8,9 @@ from fastapi import FastAPI, Header, HTTPException, Query
 app = FastAPI(title="HomeLab agent", docs_url=None, redoc_url=None)
 KEY = os.environ.get("HOMELAB_AGENT_KEY", "")
 CONTAINER_MODE = os.environ.get("HOMELAB_AGENT_CONTAINER") == "1"
+if len(KEY.strip()) < 16 or KEY.strip() != KEY or KEY == "change-me":
+    raise RuntimeError("HOMELAB_AGENT_KEY is required: at least 16 characters, no surrounding whitespace, not the example value")
 if CONTAINER_MODE:
-    if not KEY.strip():
-        raise RuntimeError("HOMELAB_AGENT_KEY is required for the container agent")
     psutil.PROCFS_PATH = "/host/proc"
 
 
@@ -48,7 +48,7 @@ def run(cmd: list[str], timeout=5) -> dict[str, Any]:
         return {"rc": 1, "out": f"error: {e}"}
 
 def auth(x_agent_key: str | None):
-    if KEY and x_agent_key != KEY:
+    if not x_agent_key or not hmac.compare_digest(x_agent_key.encode(), KEY.encode()):
         raise HTTPException(401, "invalid agent key")
 
 def firewall() -> dict[str, Any]:
@@ -86,6 +86,171 @@ def fail2ban() -> dict[str, Any]:
             details[jail] = out["out"]
     return {"active": active, "jails": jails, "details": details, "raw": status if status else "Fail2Ban not active or not configured."}
 
+_io_lock = threading.Lock()
+_io_state: dict[str, Any] = {"time": None, "disk": None, "net": None, "rates": None}
+_cache: dict[str, tuple[float, Any]] = {}
+IGNORED_INTERFACES = ("veth", "docker", "br-")
+
+
+def sample_io():
+    return time.monotonic(), psutil.disk_io_counters(), psutil.net_io_counters(pernic=True)
+
+
+def io_rates() -> dict[str, Any]:
+    """Per-second disk and network rates from counter deltas between calls."""
+    with _io_lock:
+        previous = (_io_state["time"], _io_state["disk"], _io_state["net"])
+        if previous[0] is None:
+            previous = sample_io()
+            time.sleep(0.5)
+        elif time.monotonic() - previous[0] < 1 and _io_state["rates"]:
+            return _io_state["rates"]
+        now, disk, net = sample_io()
+        elapsed = max(now - previous[0], 0.001)
+        rate = lambda new, old: max(0, new - old) / elapsed
+        disk_io = None
+        if disk is not None and previous[1] is not None:
+            disk_io = {"read_bytes_per_s": rate(disk.read_bytes, previous[1].read_bytes),
+                       "write_bytes_per_s": rate(disk.write_bytes, previous[1].write_bytes)}
+        interfaces = []
+        for name, counters in sorted(net.items()):
+            old = previous[2].get(name)
+            if old is None or name == "lo" or name.startswith(IGNORED_INTERFACES):
+                continue
+            interfaces.append({"name": name, "rx_bytes_per_s": rate(counters.bytes_recv, old.bytes_recv),
+                               "tx_bytes_per_s": rate(counters.bytes_sent, old.bytes_sent)})
+        rates = {"disk_io": disk_io, "network": interfaces}
+        _io_state.update(time=now, disk=disk, net=net, rates=rates)
+        return rates
+
+
+def cached(key: str, seconds: float, producer):
+    saved = _cache.get(key)
+    if saved and time.monotonic() - saved[0] < seconds:
+        return saved[1]
+    value = producer()
+    _cache[key] = (time.monotonic(), value)
+    return value
+
+
+def unavailable(reason: str) -> dict[str, Any]:
+    return {"available": False, "reason": reason}
+
+
+def smart_command() -> list[str]:
+    return ["smartctl"] if CONTAINER_MODE else ["sudo", "-n", "smartctl"]
+
+
+def smart_disk(device: dict[str, Any]) -> dict[str, Any]:
+    name, kind = device.get("name", ""), device.get("type")
+    if not re.fullmatch(r"/dev/[A-Za-z0-9/_-]+", name) or not (kind is None or re.fullmatch(r"[A-Za-z0-9,]+", kind)):
+        raise ValueError("Invalid device")
+    # smartctl exit codes are bit masks, so the JSON output is used regardless of the return code
+    result = run(smart_command() + ["-j", "-H", "-A", "-n", "standby"] + (["-d", kind] if kind else []) + [name], timeout=15)
+    try:
+        data = json.loads(result["out"])
+    except ValueError:
+        return {"device": name, "available": False, "reason": result["out"][:200] or "No smartctl output"}
+    messages = [m.get("string", "") for m in data.get("smartctl", {}).get("messages", []) if m.get("severity") == "error"]
+    if "passed" not in data.get("smart_status", {}):
+        return {"device": name, "available": False, "reason": "; ".join(messages) or "SMART status unavailable"}
+    attributes = {a.get("id"): a.get("raw", {}).get("value") for a in data.get("ata_smart_attributes", {}).get("table", [])}
+    nvme = data.get("nvme_smart_health_information_log", {})
+    problems = []
+    if not data["smart_status"]["passed"]:
+        problems.append("SMART health check failed")
+    for attribute, label in ((5, "reallocated sectors"), (197, "pending sectors"), (198, "uncorrectable sectors")):
+        if isinstance(attributes.get(attribute), int) and attributes[attribute] > 0:
+            problems.append(f"{attributes[attribute]} {label}")
+    if nvme.get("critical_warning"):
+        problems.append("NVMe critical warning")
+    if nvme.get("media_errors"):
+        problems.append(f"{nvme['media_errors']} media errors")
+    return {"device": name, "available": True, "model": data.get("model_name"), "passed": data["smart_status"]["passed"],
+            "temperature_c": data.get("temperature", {}).get("current"),
+            "power_on_hours": data.get("power_on_time", {}).get("hours"),
+            "percentage_used": nvme.get("percentage_used"), "problems": problems}
+
+
+def smart() -> dict[str, Any]:
+    if os.environ.get("HOMELAB_ENABLE_SMART") != "1":
+        return unavailable("S.M.A.R.T. access is not enabled for this agent.")
+    if CONTAINER_MODE and not shutil.which("smartctl"):
+        return unavailable("smartctl is not installed in this agent image.")
+    scan = run(smart_command() + ["--scan", "-j"])
+    try:
+        devices = json.loads(scan["out"]).get("devices", [])
+    except ValueError:
+        return unavailable(scan["out"][:200] or "smartctl scan failed")
+    if not devices:
+        return unavailable("No S.M.A.R.T. capable devices found.")
+    disks = []
+    for device in devices:
+        try:
+            disks.append(smart_disk(device))
+        except ValueError:
+            continue
+    return {"available": True, "disks": disks}
+
+
+def gpu() -> dict[str, Any]:
+    if not shutil.which("nvidia-smi"):
+        return unavailable("No NVIDIA GPU tools found.")
+    result = run(["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu",
+                  "--format=csv,noheader,nounits"])
+    if result["rc"] != 0:
+        return unavailable(result["out"][:200] or "nvidia-smi failed")
+    gpus = []
+    for line in result["out"].splitlines():
+        parts = [part.strip() for part in line.split(",")]
+        if len(parts) != 5:
+            continue
+        number = lambda value: float(value) if re.fullmatch(r"\d+(\.\d+)?", value) else None
+        gpus.append({"name": parts[0], "utilization_percent": number(parts[1]), "memory_used_mib": number(parts[2]),
+                     "memory_total_mib": number(parts[3]), "temperature_c": number(parts[4])})
+    return {"available": True, "gpus": gpus} if gpus else unavailable("No GPU reported.")
+
+
+def zfs() -> dict[str, Any]:
+    if not shutil.which("zpool"):
+        return unavailable("ZFS tools not found.")
+    result = run(["zpool", "list", "-H", "-p", "-o", "name,health,size,allocated"])
+    if result["rc"] != 0:
+        return unavailable(result["out"][:200] or "zpool failed")
+    pools = []
+    for line in result["out"].splitlines():
+        parts = line.split("\t")
+        if len(parts) == 4 and parts[2].isdigit() and parts[3].isdigit() and int(parts[2]):
+            pools.append({"name": parts[0], "health": parts[1], "size_bytes": int(parts[2]),
+                          "used_percent": round(int(parts[3]) / int(parts[2]) * 100, 1)})
+    return {"available": True, "pools": pools} if pools else unavailable("No ZFS pools found.")
+
+
+def battery() -> dict[str, Any]:
+    try:
+        info = psutil.sensors_battery()
+    except Exception:
+        info = None
+    if info is None:
+        return unavailable("No battery found.")
+    return {"available": True, "percent": round(info.percent, 1), "charging": info.power_plugged}
+
+
+def swap_percent() -> float | None:
+    try:
+        swap = psutil.swap_memory()
+    except Exception:
+        return None
+    return swap.percent if swap.total else None
+
+
+def safely(producer) -> dict[str, Any]:
+    try:
+        return producer()
+    except Exception as error:
+        return unavailable(f"error: {error}")
+
+
 def docker() -> tuple[list[dict[str, Any]], str | None]:
     raw = run(["docker", "ps", "-a", "--format", "{{json .}}"])
     if raw["rc"] != 0:
@@ -104,6 +269,56 @@ def docker() -> tuple[list[dict[str, Any]], str | None]:
         except (ValueError, TypeError, AttributeError) as error:
             errors.append(f"Invalid Docker response: {error}")
     return result, "; ".join(errors) or None
+
+UNIT_FACTORS = {"b": 1, "kb": 1000, "mb": 1000**2, "gb": 1000**3, "tb": 1000**4,
+                "kib": 1024, "mib": 1024**2, "gib": 1024**3, "tib": 1024**4}
+_container_net: dict[str, tuple[float, float, float]] = {}
+
+
+def parse_size(text: str) -> float | None:
+    match = re.fullmatch(r"\s*([0-9.]+)\s*([A-Za-z]+)\s*", text or "")
+    factor = UNIT_FACTORS.get(match.group(2).lower()) if match else None
+    return float(match.group(1)) * factor if factor else None
+
+
+def parse_percent(text: str) -> float | None:
+    try:
+        return float((text or "").strip().rstrip("%"))
+    except ValueError:
+        return None
+
+
+def container_stats() -> dict[str, Any]:
+    """Per-container CPU, memory and network values; network rates come from totals between samples."""
+    raw = run(["docker", "stats", "--no-stream", "--format", "{{json .}}"], timeout=6)
+    if raw["rc"] != 0:
+        return unavailable(raw["out"] or "Docker statistics could not be determined.")
+    now, containers, seen = time.monotonic(), [], set()
+    for line in raw["out"].splitlines():
+        try:
+            row = json.loads(line)
+            name = row["Name"]
+        except (ValueError, KeyError, TypeError):
+            continue
+        used, _, limit = str(row.get("MemUsage", "")).partition("/")
+        received, _, sent = str(row.get("NetIO", "")).partition("/")
+        rx, tx = parse_size(received), parse_size(sent)
+        entry = {"name": name, "cpu_percent": parse_percent(row.get("CPUPerc")),
+                 "ram_percent": parse_percent(row.get("MemPerc")), "ram_bytes": parse_size(used),
+                 "ram_limit_bytes": parse_size(limit), "net_rx_bytes_per_s": None, "net_tx_bytes_per_s": None}
+        previous = _container_net.get(name)
+        if previous and rx is not None and tx is not None and now - previous[0] >= 5 and rx >= previous[1] and tx >= previous[2]:
+            elapsed = now - previous[0]
+            entry["net_rx_bytes_per_s"] = (rx - previous[1]) / elapsed
+            entry["net_tx_bytes_per_s"] = (tx - previous[2]) / elapsed
+        if rx is not None and tx is not None and (previous is None or now - previous[0] >= 5 or rx < previous[1] or tx < previous[2]):
+            _container_net[name] = (now, rx, tx)
+        seen.add(name)
+        containers.append(entry)
+    for name in set(_container_net) - seen:
+        del _container_net[name]
+    return {"available": True, "containers": containers}
+
 
 def ssh_session_details(entry: dict[str, Any], timestamp: float, kind: str) -> dict[str, Any]:
     match = re.search(r"session (?:opened|closed) for user ([^\s(]+)", entry["MESSAGE"])
@@ -223,4 +438,9 @@ def metrics(x_agent_key: str | None = Header(default=None)):
         temp = round(max(values), 1) if values else None
     except Exception: pass
     containers, docker_error = docker()
-    return {"host": socket.gethostname(), "platform": platform.platform(), "timestamp": datetime.now(timezone.utc).isoformat(), "temperature_c": temp, "cpu_percent": psutil.cpu_percent(interval=0.2), "ram_percent": psutil.virtual_memory().percent, "storage_percent": round(root.used / root.total * 100, 1), "storage_free_bytes": root.free, "uptime_seconds": int(time.time() - psutil.boot_time()), "ufw": firewall(), "fail2ban": fail2ban(), "docker": containers, "docker_error": docker_error}
+    rates = safely(io_rates)
+    return {"host": socket.gethostname(), "platform": platform.platform(), "timestamp": datetime.now(timezone.utc).isoformat(), "temperature_c": temp, "cpu_percent": psutil.cpu_percent(interval=0.2), "ram_percent": psutil.virtual_memory().percent, "storage_percent": round(root.used / root.total * 100, 1), "storage_free_bytes": root.free, "uptime_seconds": int(time.time() - psutil.boot_time()), "ufw": firewall(), "fail2ban": fail2ban(), "docker": containers, "docker_error": docker_error,
+            "docker_stats": unavailable("Docker is not available") if docker_error and not containers else safely(lambda: cached("docker_stats", 30, container_stats)),
+            "swap_percent": swap_percent(), "disk_io": rates.get("disk_io"), "network": rates.get("network"),
+            "smart": safely(lambda: cached("smart", 600, smart)), "gpu": safely(lambda: cached("gpu", 30, gpu)),
+            "zfs": safely(lambda: cached("zfs", 30, zfs)), "battery": safely(battery)}
