@@ -196,6 +196,20 @@ The default timezone is UTC; set `HOMELAB_TIMEZONE`, for example to
 Settings and history are stored in the `dashboard-state` volume. Protect and
 back up this volume. `docker compose down -v` deletes it.
 
+For agents using HTTPS with self-signed certificates, use
+`compose.dashboard.tls.yaml` instead of `compose.yaml`. Set
+`HOMELAB_AGENT_CERTS_DIR` to an existing host directory containing only public
+agent or CA certificates, never private keys. The dashboard's UID/GID 10001
+must be able to traverse and read that directory. Configure each agent's
+`ca_cert` as `/etc/homelab-dashboard/certs/<filename>`. For example:
+
+```bash
+docker compose -f compose.dashboard.tls.yaml up -d --build
+```
+
+When replacing an existing stack, retain its Compose project name so that it
+continues to use the existing `dashboard-state` volume.
+
 ### Agent
 
 On each monitored Linux host, create a protected `.env` file containing the
