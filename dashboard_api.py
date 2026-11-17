@@ -264,7 +264,8 @@ def set_telegram(data: TelegramInput):
         settings = read_settings()
         old = settings.get("telegram", {})
         token = data.token.strip() or old.get("token", "")
-        chat_id = data.chat_id.strip()
+        chat_id = "".join(c for c in data.chat_id if c.isprintable() and not c.isspace())
+        chat_id = chat_id.translate({0x2010: "-", 0x2011: "-", 0x2012: "-", 0x2013: "-", 0x2014: "-", 0x2212: "-"})
         if set(data.events) - EVENT_TYPES:
             raise HTTPException(400, "Unknown event type")
         if data.enabled and (not token or not chat_id or not data.events):
