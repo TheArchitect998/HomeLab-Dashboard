@@ -1,0 +1,18 @@
+# Standalone dashboard Compose file with read-only agent certificate access.
+# Set HOMELAB_AGENT_CERTS_DIR to a host directory containing only public
+# certificates, then use /etc/homelab-dashboard/certs/<filename> in ca_cert.
+services:
+  dashboard:
+    extends:
+      file: compose.yaml
+      service: dashboard
+    volumes:
+      - type: bind
+        source: "${HOMELAB_AGENT_CERTS_DIR:?Set HOMELAB_AGENT_CERTS_DIR to a directory of public certificates}"
+        target: /etc/homelab-dashboard/certs
+        read_only: true
+        bind:
+          create_host_path: false
+
+volumes:
+  dashboard-state:
