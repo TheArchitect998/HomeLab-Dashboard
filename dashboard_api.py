@@ -11,13 +11,16 @@ import os
 import pathlib
 import re
 import secrets
+import smtplib
 import sqlite3
+import ssl
 import sys
 import tempfile
 import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
+from email.message import EmailMessage
 from types import SimpleNamespace
 from urllib.parse import urlsplit
 
@@ -45,6 +48,8 @@ else:
         if url.endswith("/api/metrics"):
             url = url[:-len("/api/metrics")]
         agents[f"agent-{index + 1}"] = {"url": url}
+        if os.environ.get("AGENT_CA_CERT"):
+            agents[f"agent-{index + 1}"]["ca_cert"] = os.environ["AGENT_CA_CERT"]
     cfg = SimpleNamespace(AGENTS=agents, AGENT_KEY=os.environ.get("AGENT_KEY", ""),
                           STATE_DIR=os.environ.get("HOMELAB_STATE_DIR", "/opt/homelab-dashboard/state"))
 
@@ -56,6 +61,15 @@ EVENT_TYPES = {"ssh_login", "ssh_logout", "fail2ban", "docker"}
 HISTORY_INTERVAL = 60
 HISTORY_RETENTION = 30 * 24 * 60 * 60
 HISTORY_BUCKETS = {1: 60, 24: 300, 168: 3600, 720: 14400}
+hardware_checked = {}
+PROVIDERS = ("telegram", "discord", "ntfy", "pushover", "email", "webhook", "gotify")
+EDITABLE_PROVIDERS = PROVIDERS[1:]
+CHECK_TYPES = ("ping", "http", "tcp", "dns")
+CHECK_INTERVAL = 60
+CHECK_FAILURES = 2
+MAX_CHECKS = 50
+check_status = {}
+check_failures = {}
 logger = logging.getLogger("homelab-dashboard")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -68,27 +82,17 @@ provider_failures = {}
 
 @asynccontextmanager
 async def lifespan(app):
-    task = asyncio.create_task(notify_loop())
-    monitoring_task = asyncio.create_task(monitoring_loop())
-    history_task = asyncio.create_task(history_loop())
+    tasks = [asyncio.create_task(coroutine()) for coroutine in (notify_loop, monitoring_loop, history_loop, checks_loop)]
     try:
         yield
     finally:
-        task.cancel()
-        monitoring_task.cancel()
-        history_task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
-        try:
-            await history_task
-        except asyncio.CancelledError:
-            pass
-        try:
-            await monitoring_task
-        except asyncio.CancelledError:
-            pass
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 app = FastAPI(title="HomeLab Dashboard", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
@@ -188,10 +192,18 @@ class ProviderInput(BaseModel):
     token: str = ""
     user_key: str = ""
     clear_token: bool = False
+    host: str = ""
+    port: int = 587
+    security: str = "starttls"
+    username: str = ""
+    password: str = ""
+    sender: str = ""
+    recipient: str = ""
 
 
 class MonitoringInput(BaseModel):
     temperature_enabled: bool = False
+    hardware_enabled: bool = False
     daily_report: bool = False
     daily_report_time: str | None = None
     thresholds: dict[str, float] = {}
@@ -283,8 +295,7 @@ def set_telegram(data: TelegramInput):
 
 def enabled_providers(settings):
     providers = {"telegram": settings.get("telegram", {}), **settings.get("providers", {})}
-    return {name: providers[name] for name in ("telegram", "discord", "ntfy", "pushover")
-            if providers.get(name, {}).get("enabled")}
+    return {name: providers[name] for name in PROVIDERS if providers.get(name, {}).get("enabled")}
 
 
 def delivery_paused(provider, settings):
@@ -293,21 +304,40 @@ def delivery_paused(provider, settings):
     return bool(failure and failure["fingerprint"] == fingerprint and failure["retry_at"] > time.time())
 
 
+def valid_http_url(server):
+    try:
+        url = urlsplit(server)
+        valid = (len(server) <= 1000 and url.scheme in ("http", "https") and bool(url.hostname)
+                 and not url.username and not url.password and not url.fragment
+                 and not any(c.isspace() or ord(c) < 32 for c in server))
+        url.port
+    except ValueError:
+        return False
+    return valid
+
+
+def valid_address(address):
+    return bool(re.fullmatch(r"[^@\s<>,;\"]{1,64}@[A-Za-z0-9.-]{1,253}", address))
+
+
 @app.get("/api/notifications/{provider}")
 def get_provider(provider: str):
-    if provider not in ("discord", "ntfy", "pushover"):
+    if provider not in EDITABLE_PROVIDERS:
         raise HTTPException(404, "Unknown notification provider")
     saved = read_settings().get("providers", {}).get(provider, {})
     return {"enabled": saved.get("enabled", False), "events": saved.get("events", []),
-            "server_url": saved.get("server_url", "https://ntfy.sh"),
+            "server_url": saved.get("server_url", "https://ntfy.sh" if provider == "ntfy" else ""),
             "webhook_configured": bool(saved.get("webhook_url")),
             "topic_configured": bool(saved.get("topic")), "token_configured": bool(saved.get("token")),
-            "user_key_configured": bool(saved.get("user_key")), "delivery_paused": delivery_paused(provider, saved)}
+            "user_key_configured": bool(saved.get("user_key")), "delivery_paused": delivery_paused(provider, saved),
+            "host": saved.get("host", ""), "port": saved.get("port", 587), "security": saved.get("security", "starttls"),
+            "username": saved.get("username", ""), "password_configured": bool(saved.get("password")),
+            "sender": saved.get("sender", ""), "recipient": saved.get("recipient", "")}
 
 
 @app.put("/api/notifications/{provider}")
 def set_provider(provider: str, data: ProviderInput):
-    if provider not in ("discord", "ntfy", "pushover"):
+    if provider not in EDITABLE_PROVIDERS:
         raise HTTPException(404, "Unknown notification provider")
     if set(data.events) - EVENT_TYPES:
         raise HTTPException(400, "Unknown event type")
@@ -347,6 +377,46 @@ def set_provider(provider: str, data: ProviderInput):
                 raise HTTPException(400, "Invalid ntfy token")
             saved.update(server_url=server, topic=topic, token=token)
             configured = bool(server and topic)
+        elif provider == "email":
+            host = data.host.strip()
+            password = "" if data.clear_token else (data.password or old.get("password", ""))
+            username = data.username.strip()
+            sender, recipient = data.sender.strip(), ", ".join(part.strip() for part in data.recipient.split(",") if part.strip())
+            if data.clear_token and data.password:
+                raise HTTPException(400, "Cannot remove and replace the SMTP password at the same time")
+            if host and not re.fullmatch(r"[A-Za-z0-9.-]{1,253}", host):
+                raise HTTPException(400, "Invalid SMTP host")
+            if not 1 <= data.port <= 65535 or data.security not in ("starttls", "ssl", "none"):
+                raise HTTPException(400, "Invalid SMTP port or security mode")
+            if len(username) > 256 or len(password) > 256 or any(ord(c) < 32 for c in username + password):
+                raise HTTPException(400, "Invalid SMTP credentials")
+            if (sender and not valid_address(sender)) or len(sender) > 320 or len(recipient) > 1000 or any(
+                not valid_address(part.strip()) for part in recipient.split(",") if part.strip()
+            ):
+                raise HTTPException(400, "Invalid e-mail address")
+            saved.update(host=host, port=data.port, security=data.security, username=username,
+                         password=password, sender=sender, recipient=recipient)
+            configured = bool(host and sender and recipient)
+        elif provider == "webhook":
+            url = data.webhook_url.strip() or old.get("webhook_url", "")
+            token = "" if data.clear_token else (data.token.strip() or old.get("token", ""))
+            if data.clear_token and data.token.strip():
+                raise HTTPException(400, "Cannot remove and replace the webhook token at the same time")
+            if url and not valid_http_url(url):
+                raise HTTPException(400, "Invalid webhook URL")
+            if token and (len(token) > 512 or not all(33 <= ord(c) <= 126 for c in token)):
+                raise HTTPException(400, "Invalid webhook token")
+            saved.update(webhook_url=url, token=token)
+            configured = bool(url)
+        elif provider == "gotify":
+            server = data.server_url.strip().rstrip("/")
+            token = data.token.strip() or old.get("token", "")
+            if server and (not valid_http_url(server) or urlsplit(server).query):
+                raise HTTPException(400, "Invalid Gotify server URL")
+            if token and (len(token) > 512 or not all(33 <= ord(c) <= 126 for c in token)):
+                raise HTTPException(400, "Invalid Gotify token")
+            saved.update(server_url=server, token=token)
+            configured = bool(server and token)
         else:
             token = data.token.strip() or old.get("token", "")
             user_key = data.user_key.strip() or old.get("user_key", "")
@@ -368,6 +438,7 @@ def set_provider(provider: str, data: ProviderInput):
 def get_monitoring():
     settings = read_settings().get("monitoring", {})
     return {"temperature_enabled": settings.get("temperature_enabled", False),
+            "hardware_enabled": settings.get("hardware_enabled", False),
             "daily_report": settings.get("daily_report", False),
             "daily_report_time": settings.get("daily_report_time", "12:00"),
             "thresholds": {name: settings.get("thresholds", {}).get(name, 45.0) for name in cfg.AGENTS}}
@@ -384,30 +455,42 @@ def set_monitoring(data: MonitoringInput):
         raise HTTPException(400, "Invalid host or temperature threshold (-50 to 150 °C)")
     with settings_lock:
         settings = read_settings()
-        if (data.temperature_enabled or data.daily_report) and not enabled_providers(settings):
+        if (data.temperature_enabled or data.hardware_enabled or data.daily_report) and not enabled_providers(settings):
             raise HTTPException(400, "Enable a notification provider first")
         old = settings.get("monitoring", {})
         report_started_at = old.get("report_started_at", 0) if old.get("daily_report") else int(time.time())
         temperature_started_at = old.get("temperature_started_at", 0) if old.get("temperature_enabled") else int(time.time())
+        hardware_started_at = old.get("hardware_started_at", 0) if old.get("hardware_enabled") else int(time.time())
         settings["monitoring"] = {"temperature_enabled": data.temperature_enabled,
+                                  "hardware_enabled": data.hardware_enabled,
                                   "daily_report": data.daily_report,
                                   "daily_report_time": data.daily_report_time or old.get("daily_report_time", "12:00"),
                                   "thresholds": data.thresholds,
                                   "report_started_at": report_started_at,
-                                  "temperature_started_at": temperature_started_at}
+                                  "temperature_started_at": temperature_started_at,
+                                  "hardware_started_at": hardware_started_at}
         write_settings(settings)
     return {"ok": True}
 
 
+async def agent_get(item, path, client=None, timeout=20, **kwargs):
+    """Query an agent with its own key (falling back to AGENT_KEY) and optional pinned CA certificate."""
+    key = item.get("key") or cfg.AGENT_KEY
+    headers = {"X-Agent-Key": key} if key else {}
+    url = item["url"].rstrip("/") + path
+    if client is None or item.get("ca_cert"):
+        async with httpx.AsyncClient(timeout=timeout, verify=item.get("ca_cert") or True) as own_client:
+            return await own_client.get(url, headers=headers, **kwargs)
+    return await client.get(url, headers=headers, **kwargs)
+
+
 async def fetch(name, item):
     try:
-        headers = {"X-Agent-Key": cfg.AGENT_KEY} if cfg.AGENT_KEY else {}
-        async with httpx.AsyncClient(timeout=8) as client:
-            response = await client.get(item["url"].rstrip("/") + "/api/metrics", headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            data["online"] = True
-            return name, data
+        response = await agent_get(item, "/api/metrics", timeout=8)
+        response.raise_for_status()
+        data = response.json()
+        data["online"] = True
+        return name, data
     except (httpx.HTTPError, ValueError, TypeError) as error:
         return name, {"online": False, "error": str(error)}
 
@@ -436,18 +519,45 @@ def open_history_db():
             PRIMARY KEY(host, time)
         );
         CREATE INDEX IF NOT EXISTS metrics_time ON metrics(time);
+        CREATE TABLE IF NOT EXISTS container_metrics (
+            host TEXT NOT NULL, container TEXT NOT NULL, time INTEGER NOT NULL,
+            cpu REAL, ram REAL, rx REAL, tx REAL,
+            PRIMARY KEY(host, container, time)
+        );
+        CREATE INDEX IF NOT EXISTS container_metrics_time ON container_metrics(time);
     """)
     return db
+
+
+def container_rows(name, slot, data):
+    stats = data.get("docker_stats")
+    if not isinstance(stats, dict) or not stats.get("available") or not isinstance(stats.get("containers"), list):
+        return []
+    rows = []
+    for item in stats["containers"]:
+        container = item.get("name") if isinstance(item, dict) else None
+        if not isinstance(container, str) or not container or len(container) > 128:
+            continue
+        values = []
+        for key in ("cpu_percent", "ram_percent", "net_rx_bytes_per_s", "net_tx_bytes_per_s"):
+            value = item.get(key)
+            valid = (not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+                     and value >= 0)
+            values.append(value if valid else None)
+        rows.append((name, container, slot, *values))
+    return rows
 
 
 async def collect_history(now):
     results = await asyncio.gather(*(fetch(name, item) for name, item in cfg.AGENTS.items()))
     slot = int(now // HISTORY_INTERVAL) * HISTORY_INTERVAL
     rows = []
+    container_data = []
     for name, data in results:
         if not data.get("online"):
             logger.warning("History collection failed for %s: %s", name, data.get("error", "agent offline"))
             continue
+        container_data += container_rows(name, slot, data)
         values = []
         for key in ("cpu_percent", "ram_percent", "storage_percent", "temperature_c"):
             value = data.get(key)
@@ -462,7 +572,9 @@ async def collect_history(now):
     db = open_history_db()
     try:
         db.executemany("INSERT OR REPLACE INTO metrics VALUES (?, ?, ?, ?, ?, ?)", rows)
+        db.executemany("INSERT OR REPLACE INTO container_metrics VALUES (?, ?, ?, ?, ?, ?, ?)", container_data)
         db.execute("DELETE FROM metrics WHERE time < ?", (slot - HISTORY_RETENTION + HISTORY_INTERVAL,))
+        db.execute("DELETE FROM container_metrics WHERE time < ?", (slot - HISTORY_RETENTION + HISTORY_INTERVAL,))
         db.commit()
     finally:
         db.close()
@@ -509,6 +621,177 @@ def history(host: str, hours: int = 24):
                        "missing": {"cpu": cpu_count < expected, "ram": ram_count < expected,
                                    "disk": disk_count < expected, "temperature": temp_count < expected}})
     return {"host": host, "hours": hours, "bucket_seconds": bucket_size, "points": points}
+
+
+@app.get("/api/history/containers")
+def container_history(host: str, hours: int = 24):
+    if host not in cfg.AGENTS:
+        raise HTTPException(404, "Unknown host")
+    if hours not in HISTORY_BUCKETS:
+        raise HTTPException(400, "Invalid history range")
+    bucket_size = HISTORY_BUCKETS[hours]
+    end = int(time.time() // HISTORY_INTERVAL) * HISTORY_INTERVAL + HISTORY_INTERVAL
+    start = end - hours * 3600
+    db = open_history_db()
+    try:
+        rows = db.execute("""
+            SELECT container, (time / ?) * ? AS bucket, AVG(cpu), AVG(ram), AVG(rx), AVG(tx)
+            FROM container_metrics WHERE host = ? AND time >= ? AND time < ?
+            GROUP BY container, bucket ORDER BY container, bucket
+        """, (bucket_size, bucket_size, host, start, end)).fetchall()
+    finally:
+        db.close()
+    containers = {}
+    for container, bucket, cpu, ram, rx, tx in rows:
+        containers.setdefault(container, []).append(
+            {"time": max(bucket, start), "cpu": cpu, "ram": ram, "rx": rx, "tx": tx})
+    return {"host": host, "hours": hours, "bucket_seconds": bucket_size, "containers": containers}
+
+
+class CheckInput(BaseModel):
+    name: str
+    type: str
+    target: str
+    port: int | None = None
+    notify: bool = True
+
+
+class ChecksInput(BaseModel):
+    checks: list[CheckInput]
+
+
+def normalize_check(check):
+    name, target = check.name.strip(), check.target.strip()
+    if not re.fullmatch(r"[^\x00-\x1f]{1,64}", name):
+        raise HTTPException(400, "Invalid check name (1-64 characters)")
+    if check.type not in CHECK_TYPES:
+        raise HTTPException(400, "Unknown check type")
+    port = None
+    if check.type == "http":
+        if not valid_http_url(target):
+            raise HTTPException(400, "Invalid HTTP check URL")
+    else:
+        if not re.fullmatch(r"[A-Za-z0-9:][A-Za-z0-9._:-]{0,252}", target):
+            raise HTTPException(400, "Invalid check host")
+        if check.type == "tcp":
+            if check.port is None or not 1 <= check.port <= 65535:
+                raise HTTPException(400, "A TCP check needs a port (1-65535)")
+            port = check.port
+    return {"name": name, "type": check.type, "target": target, "port": port, "notify": check.notify}
+
+
+@app.get("/api/checks")
+def get_checks():
+    checks = read_settings().get("checks", [])
+    return {"checks": [{**check, "status": check_status.get(check["name"])} for check in checks]}
+
+
+@app.put("/api/checks")
+def set_checks(data: ChecksInput):
+    if len(data.checks) > MAX_CHECKS:
+        raise HTTPException(400, f"At most {MAX_CHECKS} checks are allowed")
+    checks = [normalize_check(check) for check in data.checks]
+    if len({check["name"] for check in checks}) != len(checks):
+        raise HTTPException(400, "Check names must be unique")
+    with settings_lock:
+        settings = read_settings()
+        settings["checks"] = checks
+        write_settings(settings)
+    return {"ok": True}
+
+
+async def run_check(check):
+    """Run one reachability check and return (ok, latency in ms, error)."""
+    start = time.monotonic()
+    kind, target = check["type"], check["target"]
+    try:
+        if kind == "http":
+            async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+                response = await client.get(target)
+            error = None if response.status_code < 400 else f"HTTP {response.status_code}"
+        elif kind == "tcp":
+            _, writer = await asyncio.wait_for(asyncio.open_connection(target, check["port"]), 10)
+            writer.close()
+            error = None
+        elif kind == "dns":
+            await asyncio.wait_for(asyncio.get_running_loop().getaddrinfo(target, None), 10)
+            error = None
+        else:
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    "ping", "-c", "1", "-W", "3", target,
+                    stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+            except FileNotFoundError:
+                return False, None, "ping is not installed"
+            try:
+                error = None if await asyncio.wait_for(process.wait(), 10) == 0 else "No ping reply"
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
+                error = "Timeout"
+    except asyncio.TimeoutError:
+        return False, None, "Timeout"
+    except (OSError, httpx.HTTPError, ValueError) as exception:
+        return False, None, type(exception).__name__
+    return error is None, round((time.monotonic() - start) * 1000) if error is None else None, error
+
+
+async def evaluate_checks(client, db, providers, checks, now, runner=run_check):
+    """Run all checks, track failures and notify when a check goes down or recovers."""
+    results = await asyncio.gather(*(runner(check) for check in checks))
+    names = {check["name"] for check in checks}
+    for name in set(check_status) - names:
+        check_status.pop(name, None)
+        check_failures.pop(name, None)
+    if db is not None:
+        for (name,) in db.execute("SELECT DISTINCT name FROM provider_checks").fetchall():
+            if name not in names:
+                db.execute("DELETE FROM provider_checks WHERE name=?", (name,))
+        db.commit()
+    for check, (ok, latency, error) in zip(checks, results):
+        name = check["name"]
+        check_failures[name] = 0 if ok else check_failures.get(name, 0) + 1
+        down = check_failures[name] >= CHECK_FAILURES
+        check_status[name] = {"ok": ok, "down": down, "latency_ms": latency, "error": error, "checked_at": now}
+        if db is None or not check.get("notify", True):
+            continue
+        for provider, provider_settings in providers.items():
+            if delivery_paused(provider, provider_settings):
+                continue
+            row = db.execute("SELECT down FROM provider_checks WHERE name=? AND provider=?", (name, provider)).fetchone()
+            if bool(row and row[0]) == down or (row is None and not down):
+                continue
+            if down:
+                text = f"🔴 Check ausgefallen: {name} ({check['type']} {check['target']})\n{error or ''}".rstrip()
+            else:
+                text = f"🟢 Check wieder erreichbar: {name}"
+            try:
+                await send_notification(client, provider, provider_settings, text)
+                db.execute("INSERT OR REPLACE INTO provider_checks VALUES (?, ?, ?)", (name, provider, int(down)))
+                db.commit()
+            except (httpx.HTTPError, ValueError, KeyError, TypeError) as exception:
+                logger.error("Check notification failed for %s (%s): %s", name, provider, notification_error(exception))
+
+
+async def checks_loop():
+    db = None
+    try:
+        while True:
+            try:
+                settings = read_settings()
+                checks = settings.get("checks", [])
+                if checks or check_status:
+                    providers = enabled_providers(settings)
+                    if db is None and (providers or checks):
+                        db = open_monitoring_db()
+                    async with httpx.AsyncClient(timeout=20) as client:
+                        await evaluate_checks(client, db, providers, checks, int(time.time()))
+            except (OSError, ValueError, sqlite3.Error) as error:
+                logger.error("Reachability checks failed: %s", error)
+            await asyncio.sleep(CHECK_INTERVAL - time.time() % CHECK_INTERVAL)
+    finally:
+        if db is not None:
+            db.close()
 
 
 def notification_text(name, event):
@@ -558,10 +841,8 @@ async def poll_notifications(client, settings, cursors, now, provider="telegram"
             if since >= now:
                 continue
             try:
-                headers = {"X-Agent-Key": cfg.AGENT_KEY} if cfg.AGENT_KEY else {}
-                response = await client.get(item["url"].rstrip("/") + "/api/events",
-                                            params={"since": since, "until": now, "types": [kind]},
-                                            headers=headers)
+                response = await agent_get(item, "/api/events", client,
+                                           params={"since": since, "until": now, "types": [kind]})
                 response.raise_for_status()
                 for event in response.json()["events"]:
                     if event["type"] != kind:
@@ -639,14 +920,45 @@ async def deliver_notification(client, provider, settings, message):
             if response.json().get("status") != 1:
                 raise ValueError("Pushover rejected the message")
         return
+    elif provider == "email":
+        try:
+            await asyncio.to_thread(send_email, settings, message)
+        except (smtplib.SMTPException, OSError) as error:
+            raise ValueError("SMTP delivery failed") from error
+        return
+    elif provider == "webhook":
+        headers = {"Authorization": f"Bearer {settings['token']}"} if settings.get("token") else {}
+        response = await client.post(settings["webhook_url"], headers=headers,
+                                     json={"source": "homelab-dashboard", "message": message, "text": message})
+    elif provider == "gotify":
+        response = await client.post(f"{settings['server_url']}/message", headers={"X-Gotify-Key": settings["token"]},
+                                     json={"title": "HomeLab Dashboard", "message": message, "priority": 5})
     else:
         raise ValueError("Unknown notification provider")
     response.raise_for_status()
 
 
+def send_email(settings, message):
+    mail = EmailMessage()
+    mail["Subject"] = "HomeLab Dashboard: " + message.splitlines()[0][:80] if message.strip() else "HomeLab Dashboard"
+    mail["From"] = settings["sender"]
+    mail["To"] = settings["recipient"]
+    mail.set_content(message)
+    context = ssl.create_default_context()
+    security = settings.get("security", "starttls")
+    smtp = (smtplib.SMTP_SSL(settings["host"], settings.get("port", 465), timeout=20, context=context)
+            if security == "ssl" else smtplib.SMTP(settings["host"], settings.get("port", 587), timeout=20))
+    with smtp:
+        if security == "starttls":
+            smtp.starttls(context=context)
+        if settings.get("username"):
+            smtp.login(settings["username"], settings.get("password", ""))
+        smtp.send_message(mail)
+
+
 @app.post("/api/notifications/{provider}/test")
 async def test_provider(provider: str):
-    if provider not in ("telegram", "discord", "ntfy", "pushover"):
+    if provider not in PROVIDERS:
         raise HTTPException(404, "Unknown notification provider")
     settings = enabled_providers(read_settings()).get(provider)
     if not settings:
@@ -678,6 +990,10 @@ def open_monitoring_db():
             host TEXT, provider TEXT, above INTEGER, last_sent REAL, PRIMARY KEY(host, provider));
         CREATE TABLE IF NOT EXISTS provider_reports (
             host TEXT, provider TEXT, day TEXT, PRIMARY KEY(host, provider, day));
+        CREATE TABLE IF NOT EXISTS provider_hardware (
+            host TEXT, provider TEXT, issues TEXT, last_sent REAL, PRIMARY KEY(host, provider));
+        CREATE TABLE IF NOT EXISTS provider_checks (
+            name TEXT, provider TEXT, down INTEGER, PRIMARY KEY(name, provider));
         CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY);
     """)
     if not db.execute("SELECT 1 FROM migrations WHERE name = ?", ("notification_providers",)).fetchone():
@@ -705,10 +1021,8 @@ async def collect_report_events(client, db, now, report_started_at=0):
             if since >= now:
                 continue
             try:
-                headers = {"X-Agent-Key": cfg.AGENT_KEY} if cfg.AGENT_KEY else {}
-                response = await client.get(item["url"].rstrip("/") + "/api/events",
-                                            params={"since": since, "until": now, "types": [kind], "details": "false"},
-                                            headers=headers)
+                response = await agent_get(item, "/api/events", client,
+                                           params={"since": since, "until": now, "types": [kind], "details": "false"})
                 response.raise_for_status()
                 events = response.json()["events"]
                 for event in events:
@@ -732,8 +1046,7 @@ async def collect_temperatures(client, db, monitoring, telegram, now, providers=
             sample = db.execute("SELECT time, temperature FROM samples WHERE host=? ORDER BY time DESC LIMIT 1",
                                 (name,)).fetchone()
             if sample is None or now - sample[0] >= 300:
-                headers = {"X-Agent-Key": cfg.AGENT_KEY} if cfg.AGENT_KEY else {}
-                response = await client.get(item["url"].rstrip("/") + "/api/metrics", headers=headers)
+                response = await agent_get(item, "/api/metrics", client)
                 response.raise_for_status()
                 value = response.json().get("temperature_c")
                 if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
@@ -771,6 +1084,61 @@ async def collect_temperatures(client, db, monitoring, telegram, now, providers=
                     logger.error("Temperature notification failed for %s (%s): %s", name, provider, notification_error(error))
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as error:
             logger.error("Temperature monitoring failed for %s: %s", name, notification_error(error))
+
+
+def hardware_issues(data):
+    """Sorted problem descriptions from S.M.A.R.T. and ZFS data, or None if neither source reported."""
+    issues, reported = [], False
+    smart = data.get("smart")
+    if isinstance(smart, dict) and smart.get("available"):
+        reported = True
+        for disk in smart.get("disks", []):
+            if disk.get("available"):
+                issues += [f"S.M.A.R.T. {disk.get('device')} ({disk.get('model') or '?'}): {problem}"
+                           for problem in disk.get("problems", [])]
+    zfs = data.get("zfs")
+    if isinstance(zfs, dict) and zfs.get("available"):
+        reported = True
+        issues += [f"ZFS {pool.get('name')}: {pool.get('health')}" for pool in zfs.get("pools", [])
+                   if pool.get("health") != "ONLINE"]
+    return sorted(issues) if reported else None
+
+
+async def collect_hardware_alerts(client, db, monitoring, now, providers):
+    for name, item in cfg.AGENTS.items():
+        if now - hardware_checked.get(name, 0) < 300:
+            continue
+        try:
+            response = await agent_get(item, "/api/metrics", client)
+            response.raise_for_status()
+            issues = hardware_issues(response.json())
+            hardware_checked[name] = now
+            if issues is None:
+                continue
+            for provider, provider_settings in providers.items():
+                if delivery_paused(provider, provider_settings):
+                    continue
+                state = db.execute("SELECT issues, last_sent FROM provider_hardware WHERE host=? AND provider=?",
+                                   (name, provider)).fetchone()
+                if state is not None and state[1] < max(monitoring.get("hardware_started_at", 0),
+                                                        provider_settings.get("enabled_at", 0)):
+                    state = None
+                known = json.loads(state[0]) if state else []
+                if issues == known:
+                    continue
+                if issues:
+                    text = f"⚠️ Hardware-Warnung für {name}:\n" + "\n".join(f"• {issue}" for issue in issues)
+                else:
+                    text = f"✅ Hardware-Warnungen für {name} behoben."
+                try:
+                    await send_notification(client, provider, provider_settings, text)
+                    db.execute("INSERT OR REPLACE INTO provider_hardware VALUES (?, ?, ?, ?)",
+                               (name, provider, json.dumps(issues), now))
+                    db.commit()
+                except (httpx.HTTPError, ValueError, KeyError, TypeError) as error:
+                    logger.error("Hardware notification failed for %s (%s): %s", name, provider, notification_error(error))
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as error:
+            logger.error("Hardware monitoring failed for %s: %s", name, notification_error(error))
 
 
 async def send_daily_reports(client, db, telegram, now, providers=None, report_time="12:00"):
@@ -818,7 +1186,8 @@ async def monitoring_loop():
                 settings = read_settings()
                 monitoring = settings.get("monitoring", {})
                 providers = enabled_providers(settings)
-                enabled = providers and (monitoring.get("temperature_enabled") or monitoring.get("daily_report"))
+                enabled = providers and (monitoring.get("temperature_enabled") or monitoring.get("hardware_enabled")
+                                         or monitoring.get("daily_report"))
                 if enabled:
                     if db is None:
                         db = open_monitoring_db()
@@ -828,6 +1197,11 @@ async def monitoring_loop():
                             await collect_report_events(client, db, now, monitoring.get("report_started_at", 0))
                         if not monitoring.get("temperature_enabled"):
                             db.execute("DELETE FROM provider_temperatures")
+                            db.commit()
+                        if monitoring.get("hardware_enabled"):
+                            await collect_hardware_alerts(client, db, monitoring, now, providers)
+                        else:
+                            db.execute("DELETE FROM provider_hardware")
                             db.commit()
                         await collect_temperatures(client, db, monitoring, {}, now, providers)
                         if monitoring.get("daily_report"):

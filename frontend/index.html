@@ -368,6 +368,19 @@
       }
 
       .chart-wrap { padding: 7px 10px 8px; }
+      .hw-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 10px;
+        border-bottom: 1px solid rgba(26, 53, 81, 0.7);
+        font-size: calc(9px * var(--font-scale, 1.2));
+      }
+      .hw-row:last-child { border-bottom: 0; }
+      .hw-label { color: var(--muted); }
+      .hw-value { text-align: right; color: #c3d4e9; }
+      .hw-value.bad { color: var(--red); }
+      .hw-value.muted { color: var(--muted); }
       .chart-svg { display: block; width: 100%; height: 178px; }
       .chart-grid { stroke: #1b3550; stroke-width: 1; }
       .chart-label { fill: #8199b5; font: calc(9px * var(--font-scale, 1.2)) "Segoe UI", sans-serif; }
@@ -627,6 +640,10 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l4 2" /></svg>
           <span data-i18n="history">Verlauf</span>
         </a>
+        <a class="nav-link" href="#checks">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
+          <span data-i18n="checks">Erreichbarkeit</span>
+        </a>
         <a class="nav-link" href="#notifications">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>
           <span data-i18n="notifications">Benachrichtigungen</span>
@@ -664,6 +681,32 @@
           </section>
           <section class="panel form-panel"><button id="logout" type="button" data-i18n="logout">Abmelden</button></section>
         </div>
+        <div id="checks-page" class="settings-grid" hidden>
+          <section class="panel form-panel">
+            <h2 data-i18n="checks">Erreichbarkeit</h2>
+            <p data-i18n="checksHint">Die Prüfungen laufen jede Minute vom Dashboard aus. Nach zwei Fehlschlägen in Folge wird benachrichtigt.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th data-i18n="checkName">Name</th><th data-i18n="checkType">Typ</th><th data-i18n="checkTarget">Ziel</th><th data-i18n="status">Status</th><th data-i18n="checkNotify">Benachrichtigen</th><th></th></tr></thead>
+                <tbody id="checks-body"></tbody>
+              </table>
+            </div>
+            <p id="checks-message" role="status"></p>
+          </section>
+          <section class="panel form-panel">
+            <h2 data-i18n="checkAdd">Prüfung hinzufügen</h2>
+            <form id="check-form">
+              <label><span data-i18n="checkName">Name</span><input name="name" maxlength="64" required /></label>
+              <label><span data-i18n="checkType">Typ</span>
+                <select name="type"><option value="http">HTTP</option><option value="tcp">TCP</option><option value="ping">Ping</option><option value="dns">DNS</option></select>
+              </label>
+              <label><span data-i18n="checkTargetHelp">Ziel (URL bei HTTP, sonst Hostname oder IP)</span><input name="target" maxlength="1000" required /></label>
+              <label><span data-i18n="checkPort">Port (nur TCP)</span><input name="port" type="number" min="1" max="65535" /></label>
+              <label class="check"><input name="notify" type="checkbox" checked /><span data-i18n="checkNotifyOutage">Bei Ausfall benachrichtigen</span></label>
+              <button type="submit" data-i18n="checkAddButton">Hinzufügen</button>
+            </form>
+          </section>
+        </div>
         <div id="notifications-page" class="settings-grid" hidden>
           <section class="panel form-panel">
             <h2 data-i18n="notifications">Benachrichtigungen</h2>
@@ -673,6 +716,9 @@
                 <option value="discord">Discord</option>
                 <option value="ntfy">Ntfy</option>
                 <option value="pushover">Pushover</option>
+                <option value="email">E-Mail (SMTP)</option>
+                <option value="webhook">Webhook</option>
+                <option value="gotify">Gotify</option>
               </select>
             </label>
             <p data-i18n="providersIndependent">Mehrere Anbieter können gleichzeitig aktiviert werden. Die Auswahl dient zur Bearbeitung.</p>
@@ -737,11 +783,66 @@
               <button type="button" data-test-provider="pushover" data-i18n="sendTest">Testnachricht senden</button>
               <p id="pushover-message" role="status"></p>
             </form>
+            <form id="email-form" data-provider-form="email" hidden>
+              <h3>E-Mail (SMTP)</h3>
+              <p data-credential-status></p>
+              <label class="check"><input name="enabled" type="checkbox" /><span data-i18n="providerEnabled">Anbieter aktivieren</span></label>
+              <label><span data-i18n="smtpHost">SMTP-Server</span><input name="host" autocomplete="off" /></label>
+              <label><span data-i18n="smtpPort">Port</span><input name="port" type="number" min="1" max="65535" value="587" /></label>
+              <label><span data-i18n="smtpSecurity">Verschlüsselung</span>
+                <select name="security"><option value="starttls">STARTTLS</option><option value="ssl">SSL/TLS</option><option value="none">—</option></select>
+              </label>
+              <label><span data-i18n="smtpUser">Benutzername, optional</span><input name="username" autocomplete="off" /></label>
+              <label><span data-i18n="smtpPassword">Passwort (leer lassen, um das gespeicherte Passwort beizubehalten)</span><input name="password" type="password" autocomplete="new-password" /></label>
+              <label class="check"><input name="clear_token" type="checkbox" /><span data-i18n="clearPassword">Gespeichertes Passwort entfernen</span></label>
+              <label><span data-i18n="smtpSender">Absenderadresse</span><input name="sender" type="email" autocomplete="off" /></label>
+              <label><span data-i18n="smtpRecipient">Empfänger (mehrere durch Komma trennen)</span><input name="recipient" autocomplete="off" /></label>
+              <span data-i18n="notifyEvents">Benachrichtigen bei</span>
+              <label class="check"><input name="events" type="checkbox" value="ssh_login" /><span data-i18n="sshLogin">SSH-Anmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="ssh_logout" /><span data-i18n="sshLogout">SSH-Abmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="fail2ban" /><span data-i18n="fail2banEvents">Fail2Ban Ban/Unban</span></label>
+              <label class="check"><input name="events" type="checkbox" value="docker" /><span data-i18n="dockerEvents">Docker Start/Stopp</span></label>
+              <button type="submit" data-i18n="save">Speichern</button>
+              <button type="button" data-test-provider="email" data-i18n="sendTest">Testnachricht senden</button>
+              <p id="email-message" role="status"></p>
+            </form>
+            <form id="webhook-form" data-provider-form="webhook" hidden>
+              <h3>Webhook</h3>
+              <p data-credential-status></p>
+              <label class="check"><input name="enabled" type="checkbox" /><span data-i18n="providerEnabled">Anbieter aktivieren</span></label>
+              <label><span data-i18n="webhookUrl">Webhook-URL (leer lassen, um die gespeicherte URL beizubehalten)</span><input name="webhook_url" type="password" autocomplete="new-password" /></label>
+              <label><span data-i18n="webhookToken">Bearer-Token, optional (leer lassen, um das gespeicherte Token beizubehalten)</span><input name="token" type="password" autocomplete="new-password" /></label>
+              <label class="check"><input name="clear_token" type="checkbox" /><span data-i18n="clearToken">Gespeichertes Zugriffstoken entfernen</span></label>
+              <span data-i18n="notifyEvents">Benachrichtigen bei</span>
+              <label class="check"><input name="events" type="checkbox" value="ssh_login" /><span data-i18n="sshLogin">SSH-Anmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="ssh_logout" /><span data-i18n="sshLogout">SSH-Abmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="fail2ban" /><span data-i18n="fail2banEvents">Fail2Ban Ban/Unban</span></label>
+              <label class="check"><input name="events" type="checkbox" value="docker" /><span data-i18n="dockerEvents">Docker Start/Stopp</span></label>
+              <button type="submit" data-i18n="save">Speichern</button>
+              <button type="button" data-test-provider="webhook" data-i18n="sendTest">Testnachricht senden</button>
+              <p id="webhook-message" role="status"></p>
+            </form>
+            <form id="gotify-form" data-provider-form="gotify" hidden>
+              <h3>Gotify</h3>
+              <p data-credential-status></p>
+              <label class="check"><input name="enabled" type="checkbox" /><span data-i18n="providerEnabled">Anbieter aktivieren</span></label>
+              <label><span data-i18n="ntfyServer">Server-URL</span><input name="server_url" type="url" autocomplete="off" /></label>
+              <label><span data-i18n="gotifyToken">App-Token (leer lassen, um das gespeicherte Token beizubehalten)</span><input name="token" type="password" autocomplete="new-password" /></label>
+              <span data-i18n="notifyEvents">Benachrichtigen bei</span>
+              <label class="check"><input name="events" type="checkbox" value="ssh_login" /><span data-i18n="sshLogin">SSH-Anmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="ssh_logout" /><span data-i18n="sshLogout">SSH-Abmeldung</span></label>
+              <label class="check"><input name="events" type="checkbox" value="fail2ban" /><span data-i18n="fail2banEvents">Fail2Ban Ban/Unban</span></label>
+              <label class="check"><input name="events" type="checkbox" value="docker" /><span data-i18n="dockerEvents">Docker Start/Stopp</span></label>
+              <button type="submit" data-i18n="save">Speichern</button>
+              <button type="button" data-test-provider="gotify" data-i18n="sendTest">Testnachricht senden</button>
+              <p id="gotify-message" role="status"></p>
+            </form>
           </section>
           <section class="panel form-panel">
             <h2 data-i18n="monitoringTitle">Temperatur und Tagesbericht</h2>
             <form id="monitoring-form">
               <label class="check"><input name="temperature_enabled" type="checkbox" /><span data-i18n="temperatureAlerts">Temperaturwarnungen aktivieren (alle 5 Minuten)</span></label>
+              <label class="check"><input name="hardware_enabled" type="checkbox" /><span data-i18n="hardwareAlerts">Hardware-Warnungen aktivieren (S.M.A.R.T., ZFS)</span></label>
               <label class="check"><input name="daily_report" type="checkbox" /><span data-i18n="dailyReport">Tagesbericht aktivieren</span></label>
               <label><span data-i18n="dailyReportTime">Uhrzeit des Tagesberichts (Zeitzone des Dashboards)</span><input name="daily_report_time" type="time" value="12:00" required /></label>
               <div id="thresholds" class="form-fields"></div>
@@ -775,6 +876,8 @@
     <script>
       const chartHistory = { cpu: [], ram: [], disk: [], temperature: [] };
       const maxHistory = 36;
+      const editableProviders = ['discord', 'ntfy', 'pushover', 'email', 'webhook', 'gotify'];
+      let checksList = [];
       const colors = { cpu: '#229cff', ram: '#12c9c3', disk: '#a45bff', temperature: '#12c9c3' };
       let loading = false;
       let latestDashboard = null;
@@ -1025,8 +1128,24 @@
         setupRequired: 'Das Passwort muss zuerst lokal auf dem Dashboard-Host eingerichtet werden.',
         saved: 'Gespeichert.', requestFailed: 'Anfrage fehlgeschlagen: {error}', passwordChanged: 'Passwort geändert. Bitte erneut anmelden.',
         monitoringTitle: 'Temperatur und Tagesbericht', temperatureAlerts: 'Temperaturwarnungen aktivieren (alle 5 Minuten)',
+        hardwareAlerts: 'Hardware-Warnungen aktivieren (S.M.A.R.T., ZFS)',
         dailyReport: 'Tagesbericht aktivieren', dailyReportTime: 'Uhrzeit des Tagesberichts (Zeitzone des Dashboards)', threshold: 'Temperaturschwelle (°C)',
-        unavailable: 'Nicht verfügbar', dockerUnavailable: 'Docker-Abfrage fehlgeschlagen'
+        unavailable: 'Nicht verfügbar', dockerUnavailable: 'Docker-Abfrage fehlgeschlagen',
+        hardware: 'Hardware', swap: 'Swap', diskIo: 'Festplatten-I/O', network: 'Netzwerk', smart: 'S.M.A.R.T.', gpu: 'GPU',
+        zfs: 'ZFS', battery: 'Akku', read: 'Lesen', write: 'Schreiben', healthy: 'In Ordnung', warning: 'Warnung', charging: 'lädt',
+        checks: 'Erreichbarkeit', checksHint: 'Die Prüfungen laufen jede Minute vom Dashboard aus. Nach zwei Fehlschlägen in Folge wird benachrichtigt.',
+        checkName: 'Name', checkType: 'Typ', checkTarget: 'Ziel', checkNotify: 'Benachrichtigen', checkAdd: 'Prüfung hinzufügen',
+        checkTargetHelp: 'Ziel (URL bei HTTP, sonst Hostname oder IP)', checkPort: 'Port (nur TCP)',
+        checkNotifyOutage: 'Bei Ausfall benachrichtigen', checkAddButton: 'Hinzufügen', checkRemove: 'Entfernen',
+        noChecks: 'Noch keine Prüfungen eingerichtet.', checkPending: 'Wartet auf erste Prüfung', checkUp: 'Erreichbar',
+        checkDown: 'Ausgefallen', checkFailing: 'Fehlgeschlagen',
+        containerCpu: 'Container: CPU', containerRam: 'Container: RAM', containerRx: 'Container: Netzwerk empfangen', containerTx: 'Container: Netzwerk gesendet',
+        smtpHost: 'SMTP-Server', smtpPort: 'Port', smtpSecurity: 'Verschlüsselung', smtpUser: 'Benutzername, optional',
+        smtpPassword: 'Passwort (leer lassen, um das gespeicherte Passwort beizubehalten)', clearPassword: 'Gespeichertes Passwort entfernen',
+        smtpSender: 'Absenderadresse', smtpRecipient: 'Empfänger (mehrere durch Komma trennen)',
+        webhookUrl: 'Webhook-URL (leer lassen, um die gespeicherte URL beizubehalten)',
+        webhookToken: 'Bearer-Token, optional (leer lassen, um das gespeicherte Token beizubehalten)',
+        gotifyToken: 'App-Token (leer lassen, um das gespeicherte Token beizubehalten)'
       });
       Object.assign(translations.en, {
         settings: 'Settings', notifications: 'Notifications', history: 'History',
@@ -1055,8 +1174,24 @@
         setupRequired: 'Set the password locally on the dashboard host first.',
         saved: 'Saved.', requestFailed: 'Request failed: {error}', passwordChanged: 'Password changed. Please log in again.',
         monitoringTitle: 'Temperature and daily report', temperatureAlerts: 'Enable temperature alerts (every 5 minutes)',
+        hardwareAlerts: 'Enable hardware alerts (S.M.A.R.T., ZFS)',
         dailyReport: 'Enable daily report', dailyReportTime: 'Daily report time (dashboard time zone)', threshold: 'Temperature threshold (°C)',
-        unavailable: 'Unavailable', dockerUnavailable: 'Docker query failed'
+        unavailable: 'Unavailable', dockerUnavailable: 'Docker query failed',
+        hardware: 'Hardware', swap: 'Swap', diskIo: 'Disk I/O', network: 'Network', smart: 'S.M.A.R.T.', gpu: 'GPU',
+        zfs: 'ZFS', battery: 'Battery', read: 'Read', write: 'Write', healthy: 'Healthy', warning: 'Warning', charging: 'charging',
+        checks: 'Reachability', checksHint: 'Checks run every minute from the dashboard. A notification is sent after two failures in a row.',
+        checkName: 'Name', checkType: 'Type', checkTarget: 'Target', checkNotify: 'Notify', checkAdd: 'Add check',
+        checkTargetHelp: 'Target (URL for HTTP, otherwise host name or IP)', checkPort: 'Port (TCP only)',
+        checkNotifyOutage: 'Notify on outage', checkAddButton: 'Add', checkRemove: 'Remove',
+        noChecks: 'No checks configured yet.', checkPending: 'Waiting for first check', checkUp: 'Reachable',
+        checkDown: 'Down', checkFailing: 'Failing',
+        containerCpu: 'Containers: CPU', containerRam: 'Containers: RAM', containerRx: 'Containers: network received', containerTx: 'Containers: network sent',
+        smtpHost: 'SMTP server', smtpPort: 'Port', smtpSecurity: 'Encryption', smtpUser: 'User name, optional',
+        smtpPassword: 'Password (leave empty to keep the saved password)', clearPassword: 'Remove saved password',
+        smtpSender: 'Sender address', smtpRecipient: 'Recipients (separate with commas)',
+        webhookUrl: 'Webhook URL (leave empty to keep the saved URL)',
+        webhookToken: 'Bearer token, optional (leave empty to keep the saved token)',
+        gotifyToken: 'App token (leave empty to keep the saved token)'
       });
       Object.assign(translations.fr, {
         settings: 'Paramètres', notifications: 'Notifications', history: 'Historique',
@@ -1086,8 +1221,24 @@
         setupRequired: 'Définissez d’abord le mot de passe localement sur l’hôte du tableau de bord.',
         saved: 'Enregistré.', requestFailed: 'Échec de la requête : {error}', passwordChanged: 'Mot de passe modifié. Reconnectez-vous.',
         monitoringTitle: 'Température et rapport quotidien', temperatureAlerts: 'Activer les alertes de température (toutes les 5 minutes)',
+        hardwareAlerts: 'Activer les alertes matérielles (S.M.A.R.T., ZFS)',
         dailyReport: 'Activer le rapport quotidien', dailyReportTime: 'Heure du rapport quotidien (fuseau horaire du tableau de bord)', threshold: 'Seuil de température (°C)',
-        unavailable: 'Indisponible', dockerUnavailable: 'Échec de la requête Docker'
+        unavailable: 'Indisponible', dockerUnavailable: 'Échec de la requête Docker',
+        hardware: 'Matériel', swap: 'Swap', diskIo: 'E/S disque', network: 'Réseau', smart: 'S.M.A.R.T.', gpu: 'GPU',
+        zfs: 'ZFS', battery: 'Batterie', read: 'Lecture', write: 'Écriture', healthy: 'OK', warning: 'Avertissement', charging: 'en charge',
+        checks: 'Disponibilité', checksHint: 'Les vérifications s’exécutent chaque minute depuis le tableau de bord. Une notification est envoyée après deux échecs consécutifs.',
+        checkName: 'Nom', checkType: 'Type', checkTarget: 'Cible', checkNotify: 'Notifier', checkAdd: 'Ajouter une vérification',
+        checkTargetHelp: 'Cible (URL pour HTTP, sinon nom d’hôte ou IP)', checkPort: 'Port (TCP uniquement)',
+        checkNotifyOutage: 'Notifier en cas de panne', checkAddButton: 'Ajouter', checkRemove: 'Supprimer',
+        noChecks: 'Aucune vérification configurée.', checkPending: 'En attente de la première vérification', checkUp: 'Joignable',
+        checkDown: 'Hors service', checkFailing: 'Échec',
+        containerCpu: 'Conteneurs : CPU', containerRam: 'Conteneurs : RAM', containerRx: 'Conteneurs : réseau reçu', containerTx: 'Conteneurs : réseau envoyé',
+        smtpHost: 'Serveur SMTP', smtpPort: 'Port', smtpSecurity: 'Chiffrement', smtpUser: 'Nom d’utilisateur, facultatif',
+        smtpPassword: 'Mot de passe (laisser vide pour conserver le mot de passe enregistré)', clearPassword: 'Supprimer le mot de passe enregistré',
+        smtpSender: 'Adresse de l’expéditeur', smtpRecipient: 'Destinataires (séparés par des virgules)',
+        webhookUrl: 'URL du webhook (laisser vide pour conserver l’URL enregistrée)',
+        webhookToken: 'Jeton Bearer facultatif (laisser vide pour conserver le jeton enregistré)',
+        gotifyToken: 'Jeton de l’application (laisser vide pour conserver le jeton enregistré)'
       });
 
       const languageLocales = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR' };
@@ -1283,6 +1434,37 @@
         </section>`;
       }
 
+      function renderHardware(host) {
+        const rate = (value) => `${formatBytes(value)}/s`;
+        const row = (label, content, state = '') => `<div class="hw-row"><span class="hw-label">${label}</span><span class="hw-value ${state}">${content}</span></div>`;
+        const missing = (label, info) => row(label, `${t('unavailable')}`, 'muted').replace('<span class="hw-value', `<span title="${escapeHtml(info?.reason || '')}" class="hw-value`);
+        const rows = [row(t('swap'), host.swap_percent === null || host.swap_percent === undefined ? t('unavailable') : formatPercent(finite(host.swap_percent)),
+                          host.swap_percent === null || host.swap_percent === undefined ? 'muted' : '')];
+        const io = host.disk_io;
+        rows.push(io ? row(t('diskIo'), `${t('read')} ${rate(io.read_bytes_per_s)} · ${t('write')} ${rate(io.write_bytes_per_s)}`) : missing(t('diskIo')));
+        const interfaces = Array.isArray(host.network) ? host.network : [];
+        rows.push(...(interfaces.length ? interfaces.map((item) => row(`${t('network')} ${escapeHtml(item.name)}`, `↓ ${rate(item.rx_bytes_per_s)} · ↑ ${rate(item.tx_bytes_per_s)}`)) : [missing(t('network'))]));
+        const smart = host.smart;
+        if (smart?.available) {
+          rows.push(...smart.disks.map((disk) => {
+            const label = `${t('smart')} ${escapeHtml(disk.device)}`;
+            if (!disk.available) return missing(label, disk);
+            const details = [disk.model, formatTemperature(finite(disk.temperature_c))].filter((part) => part && part !== '—').map(escapeHtml).join(' · ');
+            const problems = (disk.problems || []).map(escapeHtml).join(', ');
+            return row(label, problems ? `${t('warning')}: ${problems}` : `${t('healthy')}${details ? ` · ${details}` : ''}`, problems ? 'bad' : '');
+          }));
+        } else rows.push(missing(t('smart'), smart));
+        const gpu = host.gpu;
+        rows.push(...(gpu?.available ? gpu.gpus.map((item) => row(`${t('gpu')} ${escapeHtml(item.name)}`,
+          `${formatPercent(finite(item.utilization_percent))} · ${formatTemperature(finite(item.temperature_c))} · ${formatBytes(Number(item.memory_used_mib) * 1048576)} / ${formatBytes(Number(item.memory_total_mib) * 1048576)}`)) : [missing(t('gpu'), gpu)]));
+        const zfs = host.zfs;
+        rows.push(...(zfs?.available ? zfs.pools.map((pool) => row(`${t('zfs')} ${escapeHtml(pool.name)}`,
+          `${escapeHtml(pool.health)} · ${formatPercent(finite(pool.used_percent))}`, pool.health === 'ONLINE' ? '' : 'bad')) : [missing(t('zfs'), zfs)]));
+        const battery = host.battery;
+        rows.push(battery?.available ? row(t('battery'), `${formatPercent(finite(battery.percent))}${battery.charging ? ` · ${t('charging')}` : ''}`) : missing(t('battery'), battery));
+        return rows.join('');
+      }
+
       function renderHostRows(hosts) {
         const names = Object.keys(hosts);
         if (!names.length) return `<div class="empty-row">${t('noHostsConfigured')}</div>`;
@@ -1321,26 +1503,32 @@
       }
 
       function renderContainers(hosts) {
-        const rows = Object.entries(hosts).flatMap(([hostName, host]) =>
-          (Array.isArray(host?.docker) ? host.docker : []).map((container) => ({ hostName, container }))
-        );
+        const rows = Object.entries(hosts).flatMap(([hostName, host]) => {
+          const stats = new Map((host?.docker_stats?.available ? host.docker_stats.containers : []).map((item) => [item.name, item]));
+          return (Array.isArray(host?.docker) ? host.docker : []).map((container) => ({ hostName, container, stats: stats.get(container.name) }));
+        });
         const errors = Object.entries(hosts).filter(([, host]) => host?.online && host.docker_error).map(([name, host]) =>
-          `<tr><td colspan="5" class="empty-row">${escapeHtml(name)}: ${t('dockerUnavailable')} — ${escapeHtml(host.docker_error)}</td></tr>`
+          `<tr><td colspan="8" class="empty-row">${escapeHtml(name)}: ${t('dockerUnavailable')} — ${escapeHtml(host.docker_error)}</td></tr>`
         ).join('');
-        if (!rows.length) return errors || `<tr><td class="empty-row" colspan="5">${t('noContainers')}</td></tr>`;
-        return errors + rows.map(({ hostName, container }) => {
+        if (!rows.length) return errors || `<tr><td class="empty-row" colspan="8">${t('noContainers')}</td></tr>`;
+        return errors + rows.map(({ hostName, container, stats }) => {
           const rawState = container.state || container.status || '';
           const running = rawState.toLowerCase().startsWith('running');
           const state = translations[currentLanguage][rawState.toLowerCase()] || rawState || t('unknown');
           const startedAt = container.started_at && !container.started_at.startsWith('0001-')
             ? new Date(container.started_at).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' })
             : '—';
+          const rate = (value) => finite(value) === null ? '—' : `${formatBytes(value)}/s`;
+          const network = stats ? `↓ ${rate(stats.net_rx_bytes_per_s)} · ↑ ${rate(stats.net_tx_bytes_per_s)}` : '—';
           return `<tr>
             <td>${escapeHtml(container.name)}</td>
             <td>${escapeHtml(hostName)}</td>
             <td><span class="status-text ${running ? '' : 'bad'}"><span class="dot"></span> ${escapeHtml(state)}</span></td>
             <td>${escapeHtml(startedAt)}</td>
             <td>${escapeHtml(container.restart_count ?? 0)}</td>
+            <td>${stats ? formatPercent(finite(stats.cpu_percent)) : '—'}</td>
+            <td>${stats ? formatPercent(finite(stats.ram_percent)) : '—'}</td>
+            <td>${network}</td>
           </tr>`;
         }).join('');
       }
@@ -1431,10 +1619,17 @@
             </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>${t('containers')}</th><th>${t('host')}</th><th>${t('status')}</th><th>${t('started')}</th><th>${t('restarts')}</th></tr></thead>
-                <tbody>${host.online ? renderContainers({ [name]: host }) : `<tr><td class="empty-row" colspan="5">${t('hostUnreachable')}</td></tr>`}</tbody>
+                <thead><tr><th>${t('containers')}</th><th>${t('host')}</th><th>${t('status')}</th><th>${t('started')}</th>                <th>${t('restarts')}</th><th>${t('cpu')}</th><th>${t('ram')}</th><th>${t('network')}</th></tr></thead>
+                                <tbody>${host.online ? renderContainers({ [name]: host }) : `<tr><td class="empty-row" colspan="8">${t('hostUnreachable')}</td></tr>`}</tbody>
               </table>
             </div>
+          </section>`).join('')}
+          ${Object.entries(hosts).map(([name, host]) => `<section class="panel side-panel" data-section="hosts">
+            <div class="panel-heading">
+              <h2 class="panel-title">${t('hardware')} · ${escapeHtml(name)}</h2>
+              <span class="panel-meta">${host.online ? t('online') : t('offline')}</span>
+            </div>
+            ${host.online ? renderHardware(host) : `<div class="empty-row">${t('hostUnreachable')}</div>`}
           </section>`).join('')}
             <section class="panel side-panel">
               <div class="panel-heading">
@@ -1523,9 +1718,10 @@
 
       function applyView() {
         const view = location.hash.slice(1);
-        const current = ['hosts', 'containers', 'security', 'history', 'notifications', 'settings'].includes(view) ? view : 'overview';
+        const current = ['hosts', 'containers', 'security', 'history', 'checks', 'notifications', 'settings'].includes(view) ? view : 'overview';
         document.querySelector('#app').dataset.current = current;
-        document.querySelector('#app').hidden = ['settings', 'notifications', 'history'].includes(current);
+        document.querySelector('#app').hidden = ['settings', 'notifications', 'history', 'checks'].includes(current);
+        document.querySelector('#checks-page').hidden = current !== 'checks';
         document.querySelector('#settings-page').hidden = current !== 'settings';
         document.querySelector('#notifications-page').hidden = current !== 'notifications';
         document.querySelector('#history-page').hidden = current !== 'history';
@@ -1579,7 +1775,35 @@
           { label: t('disk'), color: colors.disk, values: points.map((point) => point.disk), incomplete: points.map((point) => point.missing.disk) }
         ], { ...options, className: 'resource-panel' }) + renderChart(t('temperatureTrend'), [
           { label: t('temperature'), color: colors.temperature, values: points.map((point) => point.temperature), incomplete: points.map((point) => point.missing.temperature) }
-        ], { ...options, className: 'temperature-panel', min, max, ticks, suffix: '°' });
+        ], { ...options, className: 'temperature-panel', min, max, ticks, suffix: '°' }) + renderContainerHistory(data);
+      }
+
+      function renderContainerHistory(data) {
+        const containers = Object.entries(data.containerHistory?.containers || {}).slice(0, 8);
+        if (!containers.length) return '';
+        const palette = ['#229cff', '#12c9c3', '#a45bff', '#ff9f43', '#ff5c7a', '#8bd450', '#f7d154', '#9aa5b1'];
+        const times = [...new Set(containers.flatMap(([, points]) => points.map((point) => point.time)))].sort((a, b) => a - b);
+        const options = { times: times.map((time) => time * 1000), showDate: data.hours > 1 };
+        const series = (key, scale = 1) => containers.map(([name, points], index) => {
+          const byTime = new Map(points.map((point) => [point.time, finite(point[key])]));
+          return { label: escapeHtml(name), color: palette[index], values: times.map((time) => {
+            const value = byTime.get(time);
+            return value === null || value === undefined ? null : value / scale;
+          }) };
+        });
+        const scaled = (key, scale, minimumMax) => {
+          const all = series(key, scale);
+          const max = Math.max(minimumMax, ...all.flatMap((item) => item.values.filter((value) => value !== null)));
+          const top = max <= 100 ? Math.ceil(max / 10) * 10 : Math.ceil(max / 100) * 100;
+          return [all, { max: top, ticks: Array.from({ length: 5 }, (_, index) => Math.round(top * index / 4)) }];
+        };
+        const [cpu, cpuScale] = scaled('cpu', 1, 100);
+        const [ram, ramScale] = scaled('ram', 1, 100);
+        const [rx, rxScale] = scaled('rx', 1024, 10);
+        const [tx, txScale] = scaled('tx', 1024, 10);
+        return renderChart(t('containerCpu'), cpu, { ...options, ...cpuScale }) + renderChart(t('containerRam'), ram, { ...options, ...ramScale })
+          + renderChart(t('containerRx'), rx, { ...options, ...rxScale, suffix: ' KB/s' })
+          + renderChart(t('containerTx'), tx, { ...options, ...txScale, suffix: ' KB/s' });
       }
 
       async function loadHistory() {
@@ -1596,8 +1820,10 @@
         try {
           const params = new URLSearchParams({ host, hours: document.querySelector('#history-range').value });
           const data = await api(`/api/history?${params}`);
+          const containerHistory = await api(`/api/history/containers?${params}`).catch(() => null);
           if (request !== historyRequest) return;
           if (!Array.isArray(data.points)) throw new Error(t('invalidData'));
+          data.containerHistory = containerHistory;
           historyData = data;
           renderHistory(data);
         } catch (error) {
@@ -1640,7 +1866,7 @@
       }
 
       async function refreshProviderStatus() {
-        await Promise.all(['telegram', 'discord', 'ntfy', 'pushover'].map(async (provider) => {
+        await Promise.all(['telegram', ...editableProviders].map(async (provider) => {
           const message = document.getElementById(`${provider}-message`);
           try {
             const path = provider === 'telegram' ? '/api/telegram' : `/api/notifications/${provider}`;
@@ -1667,12 +1893,15 @@
           form.elements.enabled.checked = settings.enabled;
           form.querySelectorAll('[name="events"]').forEach((input) => { input.checked = settings.events.includes(input.value); });
           form.querySelectorAll('input[type="password"]').forEach((input) => { input.value = ''; });
-          if (provider === 'ntfy') {
-            form.elements.server_url.value = settings.server_url;
-            form.elements.clear_token.checked = false;
+          if (provider === 'ntfy' || provider === 'gotify') form.elements.server_url.value = settings.server_url;
+          if (['ntfy', 'webhook', 'email'].includes(provider)) form.elements.clear_token.checked = false;
+          if (provider === 'email') {
+            ['host', 'port', 'security', 'username', 'sender', 'recipient'].forEach((field) => { form.elements[field].value = settings[field]; });
           }
-          const configured = provider === 'discord' ? settings.webhook_configured
+          const configured = provider === 'discord' || provider === 'webhook' ? settings.webhook_configured
             : provider === 'ntfy' ? settings.topic_configured && Boolean(settings.server_url)
+            : provider === 'gotify' ? settings.token_configured && Boolean(settings.server_url)
+            : provider === 'email' ? Boolean(settings.host && settings.sender && settings.recipient)
             : settings.token_configured && settings.user_key_configured;
           setCredentialStatus(form, configured);
           message.textContent = '';
@@ -1690,6 +1919,7 @@
           const settings = await api('/api/monitoring');
           const form = document.querySelector('#monitoring-form');
           form.elements.temperature_enabled.checked = settings.temperature_enabled;
+          form.elements.hardware_enabled.checked = settings.hardware_enabled;
           form.elements.daily_report.checked = settings.daily_report;
           form.elements.daily_report_time.value = settings.daily_report_time;
           const container = document.querySelector('#thresholds');
@@ -1716,14 +1946,57 @@
         }
       }
 
+      function renderChecks() {
+        const body = document.querySelector('#checks-body');
+        if (!checksList.length) {
+          body.innerHTML = `<tr><td class="empty-row" colspan="6">${t('noChecks')}</td></tr>`;
+          return;
+        }
+        body.innerHTML = checksList.map((check, index) => {
+          const status = check.status;
+          const text = !status ? t('checkPending')
+            : status.ok ? `${t('checkUp')}${status.latency_ms === null ? '' : ` · ${status.latency_ms} ms`}`
+            : `${status.down ? t('checkDown') : t('checkFailing')}${status.error ? ` · ${status.error}` : ''}`;
+          const target = check.type === 'tcp' ? `${check.target}:${check.port}` : check.target;
+          return `<tr>
+            <td>${escapeHtml(check.name)}</td><td>${escapeHtml(check.type.toUpperCase())}</td><td>${escapeHtml(target)}</td>
+            <td><span class="status-text ${status && !status.ok ? 'bad' : ''}"><span class="dot"></span> ${escapeHtml(text)}</span></td>
+            <td>${check.notify ? '✓' : '—'}</td>
+            <td><button type="button" data-remove-check="${index}">${t('checkRemove')}</button></td>
+          </tr>`;
+        }).join('');
+      }
+
+      async function loadChecks() {
+        try {
+          checksList = (await api('/api/checks')).checks;
+          renderChecks();
+        } catch (error) {
+          document.querySelector('#checks-message').textContent = t('requestFailed', { error: error.message });
+        }
+      }
+
+      async function saveChecks(checks) {
+        const message = document.querySelector('#checks-message');
+        try {
+          await api('/api/checks', 'PUT', { checks: checks.map(({ name, type, target, port, notify }) => ({ name, type, target, port, notify })) });
+          message.textContent = t('saved');
+          await loadChecks();
+          return true;
+        } catch (error) {
+          message.textContent = t('requestFailed', { error: error.message });
+          return false;
+        }
+      }
+
       async function enterDashboard() {
         authenticated = true;
         document.querySelector('#login-screen').hidden = true;
         document.querySelector('#dashboard-header').hidden = false;
         document.querySelector('#dashboard-layout').hidden = false;
         applyView();
-        await Promise.all([loadDashboard(), loadTelegram(), loadMonitoring(),
-                           ...['discord', 'ntfy', 'pushover'].map(loadProvider)]);
+        await Promise.all([loadDashboard(), loadTelegram(), loadMonitoring(), loadChecks(),
+                           ...editableProviders.map(loadProvider)]);
         if (authenticated && location.hash === '#history') await loadHistory();
       }
 
@@ -1783,6 +2056,20 @@
             events: [...form.querySelectorAll('[name="events"]:checked')].map((input) => input.value)
           };
           if (provider === 'discord') payload.webhook_url = form.elements.webhook_url.value;
+          if (provider === 'webhook') {
+            payload.webhook_url = form.elements.webhook_url.value;
+            payload.token = form.elements.token.value;
+            payload.clear_token = form.elements.clear_token.checked;
+          }
+          if (provider === 'gotify') {
+            payload.server_url = form.elements.server_url.value;
+            payload.token = form.elements.token.value;
+          }
+          if (provider === 'email') {
+            ['host', 'security', 'username', 'password', 'sender', 'recipient'].forEach((field) => { payload[field] = form.elements[field].value; });
+            payload.port = Number(form.elements.port.value);
+            payload.clear_token = form.elements.clear_token.checked;
+          }
           if (provider === 'ntfy') {
             payload.server_url = form.elements.server_url.value;
             payload.topic = form.elements.topic.value;
@@ -1796,7 +2083,7 @@
           try {
             await api(`/api/notifications/${provider}`, 'PUT', payload);
             form.querySelectorAll('input[type="password"]').forEach((input) => { input.value = ''; });
-            if (provider === 'ntfy') form.elements.clear_token.checked = false;
+            if (['ntfy', 'webhook', 'email'].includes(provider)) form.elements.clear_token.checked = false;
             if (await loadProvider(provider) && !message.dataset.providerPaused) message.textContent = t('saved');
           } catch (error) {
             message.textContent = t('requestFailed', { error: error.message });
@@ -1820,6 +2107,20 @@
         });
       });
 
+      document.querySelector('#check-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const type = form.elements.type.value;
+        const check = { name: form.elements.name.value, type, target: form.elements.target.value,
+                        port: type === 'tcp' ? Number(form.elements.port.value) || null : null, notify: form.elements.notify.checked };
+        if (await saveChecks([...checksList, check])) form.reset();
+      });
+      document.querySelector('#checks-body').addEventListener('click', (event) => {
+        const button = event.target.closest('[data-remove-check]');
+        if (button) saveChecks(checksList.filter((_, index) => index !== Number(button.dataset.removeCheck)));
+      });
+      setInterval(() => { if (authenticated && location.hash === '#checks') loadChecks(); }, 15000);
+
       document.querySelector('#monitoring-form').addEventListener('submit', async (event) => {
         event.preventDefault();
         const form = event.currentTarget;
@@ -1827,6 +2128,7 @@
         try {
           await api('/api/monitoring', 'PUT', {
             temperature_enabled: form.elements.temperature_enabled.checked,
+            hardware_enabled: form.elements.hardware_enabled.checked,
             daily_report: form.elements.daily_report.checked,
             daily_report_time: form.elements.daily_report_time.value,
             thresholds: Object.fromEntries([...form.querySelectorAll('[data-host]')].map((input) => [input.dataset.host, Number(input.value)]))
@@ -1853,6 +2155,7 @@
       window.addEventListener('hashchange', () => {
         applyView();
         if (authenticated && location.hash === '#history') loadHistory();
+        if (authenticated && location.hash === '#checks') loadChecks();
         if (authenticated && location.hash === '#notifications') refreshProviderStatus();
         document.querySelectorAll('#security details').forEach((detail) => {
           detail.open = location.hash === '#security';
@@ -1885,6 +2188,7 @@
           label.textContent = `${label.dataset.thresholdHost}: ${t('threshold')}`;
         });
         updateTimestamp();
+        renderChecks(); renderDashboard(latestDashboard, latestSample);
         if (latestDashboard) renderDashboard(latestDashboard, latestSample);
         if (latestError) {
           document.querySelector('#system-state').innerHTML = `<span class="dot"></span>${t('connectionError')}`;

@@ -5,6 +5,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /opt/homelab-dashboard
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY backend/requirements-dashboard.txt .
 RUN pip install --no-cache-dir -r requirements-dashboard.txt \
     && mkdir -p frontend state \
