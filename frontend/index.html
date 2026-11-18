@@ -217,7 +217,7 @@
         grid-auto-rows: minmax(72px, auto);
         grid-auto-flow: dense;
         gap: 12px;
-        align-items: start;
+        align-items: stretch;
       }
 
       .metric-card { grid-column: span 9; }
@@ -1684,8 +1684,25 @@
         return 20;
       }
 
+      // Visual order is defined by style.order, not by DOM position
+      function orderedWidgets() {
+        return [...document.querySelectorAll('#app > [data-layout-id]')]
+          .map((widget, index) => ({ widget, index }))
+          .sort((a, b) => (Number(a.widget.style.order) - Number(b.widget.style.order)) || a.index - b.index)
+          .map((item) => item.widget);
+      }
+
+      function moveLayoutWidget(widget, toIndex) {
+        const widgets = orderedWidgets();
+        const from = widgets.indexOf(widget);
+        if (from < 0 || toIndex < 0 || toIndex >= widgets.length || from === toIndex) return;
+        widgets.splice(from, 1);
+        widgets.splice(toIndex, 0, widget);
+        widgets.forEach((item, order) => { item.style.order = String(order); });
+      }
+
       function saveDashboardLayout() {
-        const widgets = [...document.querySelectorAll('#app > [data-layout-id]')];
+        const widgets = orderedWidgets();
         dashboardLayout = Object.fromEntries(widgets.map((widget, order) => {
           const entry = {
             order,
@@ -1801,13 +1818,9 @@
           const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-layout-id]');
           if (target === layoutPointer.widget) { layoutPointer.swapped = false; return; }
           if (layoutPointer.swapped || !target || target.parentElement !== app) return;
-          const widgets = [...app.children].filter((widget) => widget.dataset.layoutId);
-          const movingForward = widgets.indexOf(layoutPointer.widget) < widgets.indexOf(target);
-          app.insertBefore(layoutPointer.widget, movingForward ? target.nextSibling : target);
+          moveLayoutWidget(layoutPointer.widget, orderedWidgets().indexOf(target));
           // Wait until the pointer is over the moved widget again to avoid flip-flopping
           layoutPointer.swapped = true;
-          [...app.children].filter((widget) => widget.dataset.layoutId)
-            .forEach((widget, index) => { widget.style.order = String(index); });
         });
         document.addEventListener('pointerup', finishLayoutInteraction);
         document.addEventListener('pointercancel', finishLayoutInteraction);
@@ -1816,16 +1829,13 @@
           const widget = event.target.closest('[data-layout-id]');
           if (!widget) return;
           if (event.target.matches('[data-layout-drag]')) {
-            const widgets = [...app.children].filter((item) => item.dataset.layoutId);
-            const index = widgets.indexOf(widget);
+            const index = orderedWidgets().indexOf(widget);
             const before = event.key === 'ArrowLeft' || event.key === 'ArrowUp';
             const after = event.key === 'ArrowRight' || event.key === 'ArrowDown';
             if (!before && !after) return;
             event.preventDefault();
-            if (before && index > 0) app.insertBefore(widget, widgets[index - 1]);
-            if (after && index < widgets.length - 1) app.insertBefore(widget, widgets[index + 2] || null);
-            [...app.children].filter((item) => item.dataset.layoutId)
-              .forEach((item, order) => { item.style.order = String(order); });
+            moveLayoutWidget(widget, index + (before ? -1 : 1));
+            event.target.focus();
             saveDashboardLayout();
             return;
           }
@@ -1894,8 +1904,8 @@
                                 <tbody>${host.online ? renderContainers({ [name]: host }) : `<tr><td class="empty-row" colspan="8">${t('hostUnreachable')}</td></tr>`}</tbody>
               </table>
             </div>
-          </section>`).join('')}
-          ${Object.entries(hosts).map(([name, host]) => `<section class="panel side-panel" data-section="hosts" data-layout-id="hardware-${encodeURIComponent(name)}">
+          </section>
+          <section class="panel side-panel" data-section="hosts" data-layout-id="hardware-${encodeURIComponent(name)}">
             <div class="panel-heading">
               <h2 class="panel-title">${t('hardware')} · ${escapeHtml(name)}</h2>
               <span class="panel-meta">${host.online ? t('online') : t('offline')}</span>
