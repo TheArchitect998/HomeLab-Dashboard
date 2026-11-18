@@ -5,6 +5,18 @@ from typing import Any
 import psutil
 from fastapi import FastAPI, Header, HTTPException, Query
 
+COMMANDS = {
+    "journalctl": "journalctl",
+    "ufw": "ufw",
+    "fail2ban-client": "fail2ban-client",
+    "smartctl": "smartctl",
+    "nvidia-smi": "nvidia-smi",
+    "zpool": "zpool",
+    "docker": "docker",
+}
+SUDO_COMMANDS = {"ufw", "fail2ban-client", "smartctl"}
+
+
 def env(name: str, default: str = "") -> str:
     """Read LABGUARD_<name>, falling back to the legacy HOMELAB_<name> variable."""
     return os.environ.get(f"LABGUARD_{name}", os.environ.get(f"HOMELAB_{name}", default))
@@ -35,18 +47,35 @@ def journal_command() -> list[str]:
 
 
 def security_command(tool: str) -> list[str] | None:
+    if tool not in ("ufw", "fail2ban-client"):
+        raise ValueError("Unsupported security command")
     if CONTAINER_MODE:
         flag = "UFW" if tool == "ufw" else "FAIL2BAN"
         if env(f"ENABLE_{flag}") != "1":
             return None
-        return [tool] if tool == "ufw" else [
-            tool, "-s", env("FAIL2BAN_SOCKET", "/run/fail2ban/fail2ban.sock")
+        return [COMMANDS[tool]] if tool == "ufw" else [
+            COMMANDS[tool], "-s", env("FAIL2BAN_SOCKET", "/run/fail2ban/fail2ban.sock")
         ]
-    return ["sudo", "-n", tool]
+    return ["sudo", "-n", COMMANDS[tool]]
+
+
+def allowed_command(cmd: list[str]) -> list[str]:
+    if not cmd:
+        raise ValueError("Empty command")
+    if cmd[0] != "sudo":
+        executable = COMMANDS.get(cmd[0])
+        if executable is None:
+            raise ValueError(f"Unsupported command: {cmd[0]}")
+        return [executable, *cmd[1:]]
+    if len(cmd) < 3 or cmd[1] != "-n" or cmd[2] not in SUDO_COMMANDS:
+        raise ValueError("Unsupported sudo command")
+    return ["sudo", "-n", COMMANDS[cmd[2]], *cmd[3:]]
+
 
 def run(cmd: list[str], timeout=5) -> dict[str, Any]:
+    command = allowed_command(cmd)
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(command, capture_output=True, text=True, timeout=timeout, shell=False)
         out = "\n".join(part.strip() for part in [proc.stdout, proc.stderr] if part and part.strip())
         return {"rc": proc.returncode, "out": out or ""}
     except Exception as e:
@@ -83,7 +112,7 @@ def fail2ban() -> dict[str, Any]:
         if jail_line:
             # Extract everything after the colon, split by comma, strip whitespace
             jail_str = jail_line.split(":", 1)[-1]
-            jails = [j.strip() for j in jail_str.split(",") if j.strip()]
+            jails = [j.strip() for j in jail_str.split(",") if valid_cli_name(j.strip())]
 
         # Get details for each jail
         for jail in jails:
@@ -143,7 +172,7 @@ def unavailable(reason: str) -> dict[str, Any]:
 
 
 def smart_command() -> list[str]:
-    return ["smartctl"] if CONTAINER_MODE else ["sudo", "-n", "smartctl"]
+    return [COMMANDS["smartctl"]] if CONTAINER_MODE else ["sudo", "-n", COMMANDS["smartctl"]]
 
 
 def smart_disk(device: dict[str, Any]) -> dict[str, Any]:
@@ -256,6 +285,10 @@ def safely(producer) -> dict[str, Any]:
         return unavailable(f"error: {error}")
 
 
+def valid_cli_name(value: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", value))
+
+
 def docker() -> tuple[list[dict[str, Any]], str | None]:
     raw = run(["docker", "ps", "-a", "--format", "{{json .}}"])
     if raw["rc"] != 0:
@@ -266,7 +299,10 @@ def docker() -> tuple[list[dict[str, Any]], str | None]:
         try:
             x = json.loads(line)
             name = x.get("Names", "")
-            inspect = run(["docker", "inspect", "--format", "{{json .State}}", name])
+            if not isinstance(name, str) or not valid_cli_name(name):
+                errors.append(f"Invalid Docker container name: {name!r}")
+                continue
+            inspect = run(["docker", "inspect", "--format", "{{json .State}}", "--", name])
             if inspect["rc"] != 0:
                 errors.append(f"{name}: {inspect['out'] or 'Docker inspect failed'}")
             state = json.loads(inspect["out"]) if inspect["out"].startswith("{") else {}

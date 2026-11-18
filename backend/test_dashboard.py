@@ -864,6 +864,44 @@ class AgentEventTests(unittest.TestCase):
             os.environ.pop("HOMELAB_X", None)
             self.assertEqual(self.agent.env("X", "d"), "d")
 
+    def test_run_allows_only_known_programs_and_never_uses_a_shell(self):
+        completed = self.agent.subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="ok", stderr=""
+        )
+        with patch.object(self.agent.subprocess, "run", return_value=completed) as execute:
+            self.assertEqual(self.agent.run(["docker", "inspect", "--", "web; echo unsafe"]),
+                             {"rc": 0, "out": "ok"})
+        execute.assert_called_once_with(
+            ["docker", "inspect", "--", "web; echo unsafe"],
+            capture_output=True, text=True, timeout=5, shell=False
+        )
+        with self.assertRaisesRegex(ValueError, "Unsupported command"):
+            self.agent.run(["sh", "-c", "echo unsafe"])
+
+    def test_fail2ban_ignores_invalid_jail_names(self):
+        with patch.object(self.agent, "run", side_effect=[
+            {"rc": 0, "out": "Status\n`- Jail list: --help, valid-jail, bad jail, name;id"},
+            {"rc": 0, "out": "Status for valid-jail"},
+        ]) as run:
+            result = self.agent.fail2ban()
+        self.assertEqual(result["jails"], ["valid-jail"])
+        self.assertEqual([call.args[0][-1] for call in run.call_args_list],
+                         ["status", "valid-jail"])
+
+    def test_docker_ignores_option_like_container_names(self):
+        listing = "\n".join(json.dumps({"Names": name, "Image": "example/image",
+                                      "Status": "Up"})
+                            for name in ("--help", "web;id", "valid-container"))
+        with patch.object(self.agent, "run", side_effect=[
+            {"rc": 0, "out": listing},
+            {"rc": 0, "out": '{"Status": "running"}'},
+        ]) as run:
+            containers, error = self.agent.docker()
+        self.assertEqual([container["name"] for container in containers], ["valid-container"])
+        self.assertIn("Invalid Docker container name", error)
+        self.assertEqual(run.call_args_list[-1].args[0][-2:],
+                         ["--", "valid-container"])
+
     def test_event_filtering_and_half_open_interval(self):
         journal = [
             {"__REALTIME_TIMESTAMP": "101000000", "SYSLOG_IDENTIFIER": "sshd", "MESSAGE": "pam_unix(sshd:session): session opened for user alice"},
