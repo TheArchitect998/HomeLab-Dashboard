@@ -549,7 +549,7 @@
         .content { padding: 11px 10px 20px; }
         .metric-card { min-height: 140px; padding: 11px 9px 8px; }
         .dashboard-grid { gap: 9px; }
-        #app[data-current="overview"] > [data-layout-id] { grid-column: span 48 !important; }
+        #app[data-current="overview"] > [data-layout-id], #history-charts > [data-layout-id] { grid-column: span 48 !important; }
         #app[data-current="overview"] > .metric-card { grid-column: span 24 !important; }
         #app:not([data-current="overview"]) > [data-section] { grid-column: 1 / -1 !important; }
         .chart-svg { height: 165px; }
@@ -1678,6 +1678,7 @@
           if (widget.matches('.hosts-panel')) return 48;
           return 24;
         }
+        if (widget.matches('.history-container-panel')) return 24;
         if (widget.matches('.metric-card')) return 9;
         if (widget.matches('.hosts-panel')) return 12;
         if (widget.matches('.resource-panel, .containers-panel')) return 28;
@@ -1685,15 +1686,17 @@
       }
 
       // Visual order is defined by style.order, not by DOM position
-      function orderedWidgets() {
-        return [...document.querySelectorAll('#app > [data-layout-id]')]
+      const layoutRootSelectors = ['#app', '#history-charts'];
+
+      function orderedWidgets(root) {
+        return [...root.children].filter((widget) => widget.dataset.layoutId)
           .map((widget, index) => ({ widget, index }))
           .sort((a, b) => (Number(a.widget.style.order) - Number(b.widget.style.order)) || a.index - b.index)
           .map((item) => item.widget);
       }
 
       function moveLayoutWidget(widget, toIndex) {
-        const widgets = orderedWidgets();
+        const widgets = orderedWidgets(widget.parentElement);
         const from = widgets.indexOf(widget);
         if (from < 0 || toIndex < 0 || toIndex >= widgets.length || from === toIndex) return;
         widgets.splice(from, 1);
@@ -1701,16 +1704,16 @@
         widgets.forEach((item, order) => { item.style.order = String(order); });
       }
 
-      function saveDashboardLayout() {
-        const widgets = orderedWidgets();
-        dashboardLayout = Object.fromEntries(widgets.map((widget, order) => {
+      function saveDashboardLayout(root) {
+        const widgets = orderedWidgets(root);
+        dashboardLayout = { ...dashboardLayout, ...Object.fromEntries(widgets.map((widget, order) => {
           const entry = {
             order,
             columns: Number(widget.dataset.layoutColumns) || defaultWidgetColumns(widget)
           };
           if (widget.style.height) entry.height = Math.round(widget.getBoundingClientRect().height);
           return [widget.dataset.layoutId, entry];
-        }));
+        })) };
         try {
           localStorage.setItem(dashboardLayoutKey, JSON.stringify(dashboardLayout));
         } catch (error) {
@@ -1718,8 +1721,11 @@
         }
       }
 
-      function applyDashboardLayout() {
-        const app = document.querySelector('#app');
+      function applyAllLayouts() {
+        layoutRootSelectors.forEach((selector) => applyDashboardLayout(document.querySelector(selector)));
+      }
+
+      function applyDashboardLayout(app = document.querySelector('#app')) {
         const widgets = [...app.children].filter((widget) => widget.dataset.layoutId);
         widgets.forEach((widget, index) => {
           widget.classList.add('layout-widget');
@@ -1762,10 +1768,19 @@
             handle.hidden = !layoutEditing;
           });
         });
-        const editing = layoutEditing && app.dataset.current === 'overview';
-        app.classList.toggle('layout-editing', editing);
-        app.querySelectorAll('.layout-drag-handle, .layout-resize-handle').forEach((handle) => {
-          handle.hidden = !editing;
+        updateLayoutEditState();
+      }
+
+      function updateLayoutEditState() {
+        const current = document.querySelector('#app').dataset.current;
+        layoutRootSelectors.forEach((selector) => {
+          const root = document.querySelector(selector);
+          const active = selector === '#app' ? current === 'overview' : location.hash === '#history';
+          const editing = layoutEditing && active;
+          root.classList.toggle('layout-editing', editing);
+          root.querySelectorAll('.layout-drag-handle, .layout-resize-handle').forEach((handle) => {
+            handle.hidden = !editing;
+          });
         });
         document.querySelector('#layout-edit').textContent = t(layoutEditing ? 'finishLayout' : 'editLayout');
         document.querySelector('#layout-edit').setAttribute('aria-pressed', String(layoutEditing));
@@ -1774,13 +1789,43 @@
 
       function finishLayoutInteraction() {
         if (!layoutPointer) return;
+        const root = layoutPointer.widget.parentElement;
         layoutPointer.widget.classList.remove('layout-moving', 'layout-resizing');
         layoutPointer = null;
-        saveDashboardLayout();
+        saveDashboardLayout(root);
       }
 
       function setupLayoutInteractions() {
-        const app = document.querySelector('#app');
+        layoutRootSelectors.forEach((selector) => setupLayoutRoot(document.querySelector(selector)));
+        document.addEventListener('pointermove', handleLayoutPointerMove);
+        document.addEventListener('pointerup', finishLayoutInteraction);
+        document.addEventListener('pointercancel', finishLayoutInteraction);
+      }
+
+      function handleLayoutPointerMove(event) {
+        if (!layoutPointer) return;
+        const app = layoutPointer.widget.parentElement;
+        if (layoutPointer.type === 'resize') {
+          const columnWidth = (app.getBoundingClientRect().width + 12) / 48;
+          const width = layoutPointer.startWidth + event.clientX - layoutPointer.startX;
+          const columns = Math.min(48, Math.max(4, Math.round((width + 12) / columnWidth)));
+          const height = Math.round((layoutPointer.startHeight + event.clientY - layoutPointer.startY) / 8) * 8;
+          layoutPointer.widget.dataset.layoutColumns = String(columns);
+          layoutPointer.widget.style.gridColumn = `span ${columns}`;
+          layoutPointer.widget.style.height = `${Math.min(2000, Math.max(80, height))}px`;
+          layoutPointer.widget.style.overflow = 'auto';
+          layoutPointer.widget.classList.add('layout-custom-height');
+          return;
+        }
+        const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-layout-id]');
+        if (target === layoutPointer.widget) { layoutPointer.swapped = false; return; }
+        if (layoutPointer.swapped || !target || target.parentElement !== app) return;
+        moveLayoutWidget(layoutPointer.widget, orderedWidgets(app).indexOf(target));
+        // Wait until the pointer is over the moved widget again to avoid flip-flopping
+        layoutPointer.swapped = true;
+      }
+
+      function setupLayoutRoot(app) {
         app.addEventListener('pointerdown', (event) => {
           if (!layoutEditing || event.button !== 0) return;
           const dragHandle = event.target.closest('[data-layout-drag]');
@@ -1801,42 +1846,19 @@
           widget.classList.add(resizeHandle ? 'layout-resizing' : 'layout-moving');
           event.target.setPointerCapture(event.pointerId);
         });
-        document.addEventListener('pointermove', (event) => {
-          if (!layoutPointer) return;
-          if (layoutPointer.type === 'resize') {
-            const columnWidth = (app.getBoundingClientRect().width + 12) / 48;
-            const width = layoutPointer.startWidth + event.clientX - layoutPointer.startX;
-            const columns = Math.min(48, Math.max(4, Math.round((width + 12) / columnWidth)));
-            const height = Math.round((layoutPointer.startHeight + event.clientY - layoutPointer.startY) / 8) * 8;
-            layoutPointer.widget.dataset.layoutColumns = String(columns);
-            layoutPointer.widget.style.gridColumn = `span ${columns}`;
-            layoutPointer.widget.style.height = `${Math.min(2000, Math.max(80, height))}px`;
-            layoutPointer.widget.style.overflow = 'auto';
-            layoutPointer.widget.classList.add('layout-custom-height');
-            return;
-          }
-          const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-layout-id]');
-          if (target === layoutPointer.widget) { layoutPointer.swapped = false; return; }
-          if (layoutPointer.swapped || !target || target.parentElement !== app) return;
-          moveLayoutWidget(layoutPointer.widget, orderedWidgets().indexOf(target));
-          // Wait until the pointer is over the moved widget again to avoid flip-flopping
-          layoutPointer.swapped = true;
-        });
-        document.addEventListener('pointerup', finishLayoutInteraction);
-        document.addEventListener('pointercancel', finishLayoutInteraction);
         app.addEventListener('keydown', (event) => {
           if (!layoutEditing) return;
           const widget = event.target.closest('[data-layout-id]');
           if (!widget) return;
           if (event.target.matches('[data-layout-drag]')) {
-            const index = orderedWidgets().indexOf(widget);
+            const index = orderedWidgets(app).indexOf(widget);
             const before = event.key === 'ArrowLeft' || event.key === 'ArrowUp';
             const after = event.key === 'ArrowRight' || event.key === 'ArrowDown';
             if (!before && !after) return;
             event.preventDefault();
             moveLayoutWidget(widget, index + (before ? -1 : 1));
             event.target.focus();
-            saveDashboardLayout();
+            saveDashboardLayout(app);
             return;
           }
           if (!event.target.matches('[data-layout-resize]')) return;
@@ -1854,7 +1876,7 @@
             widget.classList.add('layout-resizing');
             widget.classList.add('layout-custom-height');
           } else return;
-          saveDashboardLayout();
+          saveDashboardLayout(app);
         });
       }
 
@@ -2004,15 +2026,9 @@
         const app = document.querySelector('#app');
         app.dataset.current = current;
         app.hidden = ['settings', 'notifications', 'history', 'checks'].includes(current);
-        document.querySelector('#layout-toolbar').hidden = !authenticated || current !== 'overview';
-        const editing = layoutEditing && current === 'overview';
-        app.classList.toggle('layout-editing', editing);
-        app.querySelectorAll('.layout-drag-handle, .layout-resize-handle').forEach((handle) => {
-          handle.hidden = !editing;
-        });
-        document.querySelector('#layout-edit').textContent = t(layoutEditing ? 'finishLayout' : 'editLayout');
-        document.querySelector('#layout-edit').setAttribute('aria-pressed', String(layoutEditing));
-        document.querySelector('#layout-reset').hidden = !layoutEditing || current !== 'overview';
+        document.querySelector('#layout-toolbar').hidden = !authenticated || !['overview', 'history'].includes(current);
+        updateLayoutEditState();
+        document.querySelector('#layout-reset').hidden = !layoutEditing || !['overview', 'history'].includes(current);
         document.querySelector('#checks-page').hidden = current !== 'checks';
         document.querySelector('#settings-page').hidden = current !== 'settings';
         document.querySelector('#notifications-page').hidden = current !== 'notifications';
@@ -2065,9 +2081,10 @@
           { label: t('cpu'), color: colors.cpu, values: points.map((point) => point.cpu), incomplete: points.map((point) => point.missing.cpu) },
           { label: t('ram'), color: colors.ram, values: points.map((point) => point.ram), incomplete: points.map((point) => point.missing.ram) },
           { label: t('disk'), color: colors.disk, values: points.map((point) => point.disk), incomplete: points.map((point) => point.missing.disk) }
-        ], { ...options, className: 'resource-panel' }) + renderChart(t('temperatureTrend'), [
+        ], { ...options, className: 'resource-panel', layoutId: 'history-resources' }) + renderChart(t('temperatureTrend'), [
           { label: t('temperature'), color: colors.temperature, values: points.map((point) => point.temperature), incomplete: points.map((point) => point.missing.temperature) }
-        ], { ...options, className: 'temperature-panel', min, max, ticks, suffix: '°' }) + renderContainerHistory(data);
+        ], { ...options, className: 'temperature-panel', layoutId: 'history-temperature', min, max, ticks, suffix: '°' }) + renderContainerHistory(data);
+        applyDashboardLayout(document.querySelector('#history-charts'));
       }
 
       function renderContainerHistory(data) {
@@ -2093,9 +2110,11 @@
         const [ram, ramScale] = scaled('ram', 1, 100);
         const [rx, rxScale] = scaled('rx', 1024, 10);
         const [tx, txScale] = scaled('tx', 1024, 10);
-        return renderChart(t('containerCpu'), cpu, { ...options, ...cpuScale }) + renderChart(t('containerRam'), ram, { ...options, ...ramScale })
-          + renderChart(t('containerRx'), rx, { ...options, ...rxScale, suffix: ' KB/s' })
-          + renderChart(t('containerTx'), tx, { ...options, ...txScale, suffix: ' KB/s' });
+        const panel = { ...options, className: 'history-container-panel' };
+        return renderChart(t('containerCpu'), cpu, { ...panel, ...cpuScale, layoutId: 'history-container-cpu' })
+          + renderChart(t('containerRam'), ram, { ...panel, ...ramScale, layoutId: 'history-container-ram' })
+          + renderChart(t('containerRx'), rx, { ...panel, ...rxScale, suffix: ' KB/s', layoutId: 'history-container-rx' })
+          + renderChart(t('containerTx'), tx, { ...panel, ...txScale, suffix: ' KB/s', layoutId: 'history-container-tx' });
       }
 
       async function loadHistory() {
@@ -2467,11 +2486,11 @@
       dashboardLayout = loadDashboardLayout();
       setupLayoutInteractions();
       window.addEventListener('resize', () => {
-        if (latestDashboard) applyDashboardLayout();
+        if (latestDashboard) applyAllLayouts();
       });
       document.querySelector('#layout-edit').addEventListener('click', () => {
         layoutEditing = !layoutEditing;
-        applyDashboardLayout();
+        applyAllLayouts();
       });
       document.querySelector('#layout-reset').addEventListener('click', () => {
         dashboardLayout = {};
@@ -2480,7 +2499,7 @@
         } catch (error) {
           console.error('Could not reset dashboard layout:', error);
         }
-        applyDashboardLayout();
+        applyAllLayouts();
       });
 
       document.querySelector('#language-select').addEventListener('change', (event) => {
@@ -2513,7 +2532,7 @@
         else showLogin(status.configured ? '' : t('setupRequired'));
       }).catch((error) => showLogin(t('requestFailed', { error: error.message })));
       setInterval(() => { if (authenticated) loadDashboard(); }, 15000);
-      setInterval(() => { if (authenticated && location.hash === '#history') loadHistory(); }, 60000);
+      setInterval(() => { if (authenticated && location.hash === '#history' && !layoutPointer) loadHistory(); }, 60000);
       setInterval(() => { if (authenticated && location.hash === '#notifications') refreshProviderStatus(); }, 15000);
     </script>
   </body>
