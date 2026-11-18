@@ -32,6 +32,10 @@ and a daily report with a configurable time help you monitor your homelab.
 
 ## Features
 
+![NodeSentinel Übersicht](screenshots/dashboard-aktuell.png)
+
+Der Screenshot verwendet synthetische Beispieldaten.
+
 - CPU, RAM, root filesystem and temperature monitoring
 - Persistent per-host metrics history: one sample per minute, retained for 30 days
 - Docker container status, start times and restarts, plus CPU, RAM and network per container with history
