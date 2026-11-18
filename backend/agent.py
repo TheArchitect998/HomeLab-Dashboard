@@ -5,11 +5,16 @@ from typing import Any
 import psutil
 from fastapi import FastAPI, Header, HTTPException, Query
 
-app = FastAPI(title="HomeLab agent", docs_url=None, redoc_url=None)
-KEY = os.environ.get("HOMELAB_AGENT_KEY", "")
-CONTAINER_MODE = os.environ.get("HOMELAB_AGENT_CONTAINER") == "1"
+def env(name: str, default: str = "") -> str:
+    """Read LABGUARD_<name>, falling back to the legacy HOMELAB_<name> variable."""
+    return os.environ.get(f"LABGUARD_{name}", os.environ.get(f"HOMELAB_{name}", default))
+
+
+app = FastAPI(title="LabGuard agent", docs_url=None, redoc_url=None)
+KEY = env("AGENT_KEY")
+CONTAINER_MODE = env("AGENT_CONTAINER") == "1"
 if len(KEY.strip()) < 16 or KEY.strip() != KEY or KEY == "change-me":
-    raise RuntimeError("HOMELAB_AGENT_KEY is required: at least 16 characters, no surrounding whitespace, not the example value")
+    raise RuntimeError("LABGUARD_AGENT_KEY is required: at least 16 characters, no surrounding whitespace, not the example value")
 if CONTAINER_MODE:
     psutil.PROCFS_PATH = "/host/proc"
 
@@ -17,7 +22,7 @@ if CONTAINER_MODE:
 def journal_command() -> list[str]:
     if not CONTAINER_MODE:
         return ["journalctl"]
-    directory = os.environ.get("HOMELAB_JOURNAL_DIR", "")
+    directory = env("JOURNAL_DIR")
     if not directory or not os.path.isdir(directory):
         raise HTTPException(503, "Host journal is not configured or accessible")
     try:
@@ -32,10 +37,10 @@ def journal_command() -> list[str]:
 def security_command(tool: str) -> list[str] | None:
     if CONTAINER_MODE:
         flag = "UFW" if tool == "ufw" else "FAIL2BAN"
-        if os.environ.get(f"HOMELAB_ENABLE_{flag}") != "1":
+        if env(f"ENABLE_{flag}") != "1":
             return None
         return [tool] if tool == "ufw" else [
-            tool, "-s", os.environ.get("HOMELAB_FAIL2BAN_SOCKET", "/run/fail2ban/fail2ban.sock")
+            tool, "-s", env("FAIL2BAN_SOCKET", "/run/fail2ban/fail2ban.sock")
         ]
     return ["sudo", "-n", tool]
 
@@ -173,7 +178,7 @@ def smart_disk(device: dict[str, Any]) -> dict[str, Any]:
 
 
 def smart() -> dict[str, Any]:
-    if os.environ.get("HOMELAB_ENABLE_SMART") != "1":
+    if env("ENABLE_SMART") != "1":
         return unavailable("S.M.A.R.T. access is not enabled for this agent.")
     if CONTAINER_MODE and not shutil.which("smartctl"):
         return unavailable("smartctl is not installed in this agent image.")

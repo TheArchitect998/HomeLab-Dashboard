@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#071321" />
-    <title>Homelab Monitor</title>
+    <title>LabGuard</title>
     <style>
       :root {
         color-scheme: dark;
@@ -639,7 +639,7 @@
   <body>
     <section id="login-screen" class="login-screen" hidden>
       <div class="panel form-panel">
-        <h1>Homelab Monitor</h1>
+        <h1>LabGuard</h1>
         <form id="login-form">
           <label><span data-i18n="password">Passwort</span><input name="password" type="password" autocomplete="current-password" required /></label>
           <button type="submit" data-i18n="login">Anmelden</button>
@@ -648,13 +648,13 @@
       </div>
     </section>
     <header class="topbar" id="dashboard-header" hidden>
-      <a class="brand" href="#overview" aria-label="Homelab Monitor Übersicht" data-i18n-aria-label="brandAria">
+      <a class="brand" href="#overview" aria-label="LabGuard Übersicht" data-i18n-aria-label="brandAria">
         <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="m12 2 9 4.5-9 4.5-9-4.5L12 2Z" />
           <path d="m3 11 9 4.5 9-4.5M3 16l9 5 9-5M3 6.5V16m18-9.5V16M7 8.5v4m10-4v4" />
         </svg>
         <span>
-          <span class="brand-title">Homelab Monitor</span>
+          <span class="brand-title">LabGuard</span>
           <span class="brand-subtitle" data-i18n="brandSubtitle">Infrastructure Overview</span>
         </span>
       </a>
@@ -951,8 +951,8 @@
 
       const translations = {
         de: {
-          pageTitle: 'Homelab Monitor',
-          brandAria: 'Homelab Monitor Übersicht',
+          pageTitle: 'LabGuard',
+          brandAria: 'LabGuard Übersicht',
           brandSubtitle: 'Infrastrukturübersicht',
           languageLabel: 'Sprache',
           loadingStatus: 'Lade Status',
@@ -1027,8 +1027,8 @@
           invalidData: 'Die Dashboard-API hat ein ungültiges Datenformat geliefert'
         },
         en: {
-          pageTitle: 'Homelab Monitor',
-          brandAria: 'Homelab Monitor overview',
+          pageTitle: 'LabGuard',
+          brandAria: 'LabGuard overview',
           brandSubtitle: 'Infrastructure Overview',
           languageLabel: 'Language',
           loadingStatus: 'Loading status',
@@ -1103,8 +1103,8 @@
           invalidData: 'The dashboard API returned an invalid data format'
         },
         fr: {
-          pageTitle: 'Moniteur Homelab',
-          brandAria: 'Vue d’ensemble du moniteur Homelab',
+          pageTitle: 'LabGuard',
+          brandAria: 'Vue d’ensemble de LabGuard',
           brandSubtitle: 'Vue d’ensemble de l’infrastructure',
           languageLabel: 'Langue',
           loadingStatus: 'Chargement du statut',
@@ -2043,7 +2043,7 @@
 
       async function api(path, method = 'GET', body) {
         const response = await fetch(path, {
-          method, headers: method === 'GET' ? {} : { 'Content-Type': 'application/json', 'X-Requested-With': 'HomeLab' },
+          method, headers: method === 'GET' ? {} : { 'Content-Type': 'application/json', 'X-Requested-With': 'LabGuard' },
           body: body === undefined ? undefined : JSON.stringify(body)
         });
         const data = await response.json();

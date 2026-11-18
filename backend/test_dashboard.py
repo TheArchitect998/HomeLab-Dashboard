@@ -48,7 +48,7 @@ class DashboardTests(unittest.TestCase):
         self.dashboard.provider_locks.clear()
         self.dashboard.write_settings({"password": self.dashboard.password_hash("correct-password")})
         self.client = TestClient(self.dashboard.app)
-        self.headers = {"X-Requested-With": "HomeLab"}
+        self.headers = {"X-Requested-With": "LabGuard"}
 
     def login(self, password="correct-password"):
         return self.client.post("/api/auth/login", json={"password": password}, headers=self.headers)
@@ -92,7 +92,7 @@ class DashboardTests(unittest.TestCase):
         agent_path = ROOT / "agent.py"
         for key in ("", "change-me", "short", " " + "k" * 20):
             with patch.dict(os.environ, {"HOMELAB_AGENT_KEY": key}):
-                with self.assertRaisesRegex(RuntimeError, "HOMELAB_AGENT_KEY"):
+                with self.assertRaisesRegex(RuntimeError, "LABGUARD_AGENT_KEY"):
                     load_module("agent_test", agent_path)
         with patch.dict(os.environ, {"HOMELAB_AGENT_KEY": "k" * 20}):
             agent = load_module("agent_test", agent_path)
@@ -337,7 +337,7 @@ class DashboardTests(unittest.TestCase):
                         "topic": "private_topic", "token": "tk_test"}
             self.assertEqual(self.client.put("/api/notifications/ntfy", json=settings, headers=self.headers).status_code, 200)
             self.assertEqual(self.client.post("/api/notifications/ntfy/test", headers=self.headers).status_code, 200)
-            self.assertEqual(requests, [("/private_topic", "Bearer tk_test", "HomeLab Dashboard: test notification")])
+            self.assertEqual(requests, [("/private_topic", "Bearer tk_test", "LabGuard: test notification")])
         finally:
             server.shutdown()
             server.server_close()
@@ -524,7 +524,7 @@ class DashboardTests(unittest.TestCase):
         server.starttls.assert_called_once()
         server.login.assert_called_once_with("u", "secret")
         mail = server.send_message.call_args.args[0]
-        self.assertEqual((mail["To"], mail["Subject"]), ("x@y.test, z@y.test", "HomeLab Dashboard: ⚠️ Alarm"))
+        self.assertEqual((mail["To"], mail["Subject"]), ("x@y.test, z@y.test", "LabGuard: ⚠️ Alarm"))
 
     def test_checks_api_validation(self):
         self.login()
@@ -765,7 +765,7 @@ class DashboardTests(unittest.TestCase):
                           "storage_percent": 40, "temperature_c": None}
         with patch.object(self.dashboard.cfg, "AGENTS", agents), \
              patch.object(self.dashboard, "fetch", new=AsyncMock(side_effect=fetch)):
-            with self.assertLogs("homelab-dashboard", level="WARNING") as logs:
+            with self.assertLogs("labguard", level="WARNING") as logs:
                 asyncio.run(self.dashboard.collect_history(now))
             self.assertIn("offline", logs.output[0])
             asyncio.run(self.dashboard.collect_history(now))
@@ -838,7 +838,7 @@ class DashboardTests(unittest.TestCase):
             db.close()
         with patch.object(self.dashboard.cfg, "AGENTS", agents), \
              patch.object(self.dashboard, "fetch", new=AsyncMock(return_value=("host", {"online": False, "error": "offline"}))):
-            with self.assertLogs("homelab-dashboard", level="WARNING"):
+            with self.assertLogs("labguard", level="WARNING"):
                 with TestClient(self.dashboard.app) as client:
                     self.assertEqual(client.post("/api/auth/login", json={"password": "correct-password"},
                                                  headers=self.headers).status_code, 200)
