@@ -56,7 +56,7 @@ Der Screenshot verwendet synthetische Beispieldaten.
 ┌───────────────────────────────────────────────────┐
 │              Dashboard Host (Pi 1)                │
 │  ┌─────────────────────────────────────────────┐  │
-│  │          Web UI (FastAPI + HTML)            │  │
+│  │          Go API + HTML/JavaScript UI        │  │
 │  │       Aggregates metrics from agents        │  │
 │  └─────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────┘
@@ -70,8 +70,8 @@ Der Screenshot verwendet synthetische Beispieldaten.
 ```
 
 **How it works:**
-1. Dashboard runs a FastAPI server exposing a web UI
-2. One or more lightweight agents run on monitored devices
+1. Dashboard runs a Go HTTP server and serves the web UI
+2. One or more lightweight Go agents run on monitored devices
 3. Agents expose `/api/metrics` endpoint
 4. Dashboard polls agents and aggregates the data
 5. Web UI auto-refreshes every 15 seconds
@@ -80,16 +80,15 @@ Der Screenshot verwendet synthetische Beispieldaten.
 
 ## Requirements
 
-**Dashboard Host:**
-- Python 3.11+
-- pip / venv
-- Linux (systemd-enabled, recommended)
+Choose one deployment method:
 
-**Agent Hosts:**
-- Python 3.11+
-- pip / venv
-- Linux (systemd-enabled, recommended)
-- Optional: UFW, Fail2Ban, Docker (for full feature set)
+- **Native Go:** Linux hosts and Go 1.24+ on the dashboard and each agent host.
+- **Docker Compose:** Docker Engine and the Docker Compose plugin. Go does not
+  need to be installed on the host; the Dockerfiles build the Go executable
+  inside a multi-stage image.
+
+Python is not required for either deployment. UFW, Fail2Ban and Docker on
+monitored hosts are optional agent integrations.
 
 ---
 
@@ -102,14 +101,14 @@ git clone https://github.com/TheArchitect998/NodeSentinel.git
 cd NodeSentinel
 ```
 
-### 2. Create virtual environment
+### 2. Build the Go executable
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip
-pip install fastapi uvicorn httpx psutil
+mkdir -p bin
+go build -o bin/nodesentinel ./cmd/nodesentinel
 ```
+
+For Docker deployment, skip the native build and use [Docker Compose](#docker-compose).
 
 ### 3. Configure dashboard
 
@@ -121,8 +120,8 @@ nano .env
 
 Example `.env`:
 ```env
-DASHBOARD_HOST=0.0.0.0
-DASHBOARD_PORT=8888
+NODESENTINEL_DASHBOARD_HOST=0.0.0.0
+NODESENTINEL_DASHBOARD_PORT=8888
 AGENT_URLS='["http://pi-1.local:9100/api/metrics","http://pi-2.local:9100/api/metrics"]'
 AGENT_KEY=your-long-random-agent-key
 NODESENTINEL_STATE_DIR=/opt/nodesentinel/state
@@ -141,7 +140,7 @@ sudo chmod 600 .env
 set -a
 source .env
 set +a
-python dashboard_api.py setup
+./bin/nodesentinel dashboard setup
 ```
 
 Set a password of at least 12 characters. For a service installation, run the setup command as the same user as the dashboard, with the same `NODESENTINEL_STATE_DIR`. The password can later be changed under Settings.
@@ -149,11 +148,10 @@ Set a password of at least 12 characters. For a service installation, run the se
 ### 5. Start dashboard
 
 ```bash
-source venv/bin/activate
 set -a
 source .env
 set +a
-uvicorn dashboard_api:app --host 0.0.0.0 --port 8888
+./bin/nodesentinel dashboard
 ```
 
 Open `http://localhost:8888` locally and sign in. Use trusted HTTPS for network access; HTTP exposes credentials and session cookies.
@@ -168,15 +166,15 @@ No prebuilt public image is required.
 ### Dashboard
 
 ```bash
-cp backend/config.example.py nodesentinel.config.py
+cp nodesentinel.config.example.json nodesentinel.config.json
 ```
 
-Edit `nodesentinel.config.py`: set the agent addresses and a strong
-`AGENT_KEY` shared with the agents. Protect this file; it may contain secrets.
+Edit `nodesentinel.config.json`: set the agent addresses and a strong
+`agent_key` shared with the agents. Protect this file; it may contain secrets.
 The container runs as UID/GID 10001 and must be able to read it. Agent
 `127.0.0.1` addresses refer to the dashboard container itself.
 
-By default, Compose mounts `./nodesentinel.config.py` relative to the
+By default, Compose mounts `./nodesentinel.config.json` relative to the
 Compose project. Set `NODESENTINEL_CONFIG_PATH` to an absolute path on the Docker
 host to use a protected configuration file elsewhere, for example when
 deploying a Git stack through Dockhand and Hawser. The file must already
@@ -185,7 +183,7 @@ read it. Do not commit the configuration file or its secrets.
 
 ```bash
 docker compose build
-docker compose run --rm dashboard python dashboard_api.py setup
+docker compose run --rm dashboard /usr/local/bin/nodesentinel dashboard setup
 docker compose up -d
 ```
 
@@ -235,7 +233,7 @@ encrypted tunnel.
 
 The agent refuses to start without `NODESENTINEL_AGENT_KEY` of at least 16
 characters (the example value `change-me` is rejected). Generate one with
-`python3 -c "import secrets; print(secrets.token_urlsafe(32))"`.
+`openssl rand -base64 32`.
 
 The agent reads host metrics and Docker status. Journal event collection and
 UFW and Fail2Ban status checks are disabled by default. Unavailable sources are
@@ -326,11 +324,9 @@ cd /opt/nodesentinel
 # Clone repository
 git clone https://github.com/TheArchitect998/NodeSentinel.git .
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip
-pip install fastapi uvicorn httpx psutil
+# Build the dashboard and agent binary
+mkdir -p bin
+go build -o bin/nodesentinel ./cmd/nodesentinel
 ```
 
 #### Step 2: Configure environment
@@ -345,8 +341,8 @@ nano .env
 
 Set your agent URLs (hostnames or IPs):
 ```env
-DASHBOARD_HOST=0.0.0.0
-DASHBOARD_PORT=8888
+NODESENTINEL_DASHBOARD_HOST=0.0.0.0
+NODESENTINEL_DASHBOARD_PORT=8888
 AGENT_URLS='["http://192.168.1.100:9100/api/metrics","http://192.168.1.101:9100/api/metrics"]'
 AGENT_KEY=your-long-random-agent-key
 NODESENTINEL_STATE_DIR=/opt/nodesentinel/state
@@ -357,11 +353,10 @@ Create the state directory and set the initial password as described in [Quick S
 #### Step 3: Test locally
 
 ```bash
-source venv/bin/activate
 set -a
 source .env
 set +a
-uvicorn dashboard_api:app --host 0.0.0.0 --port 8888
+./bin/nodesentinel dashboard
 ```
 
 Visit `http://localhost:8888` to verify the dashboard loads.
@@ -382,11 +377,9 @@ cd /opt/nodesentinel
 # Clone repository
 git clone https://github.com/TheArchitect998/NodeSentinel.git .
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip
-pip install fastapi uvicorn psutil
+# Build the agent binary
+mkdir -p bin
+go build -o bin/nodesentinel ./cmd/nodesentinel
 ```
 
 #### Step 2: Configure agent
@@ -422,11 +415,10 @@ logs can contain sensitive information.
 #### Step 4: Test locally
 
 ```bash
-source venv/bin/activate
 set -a
 source nodesentinel-agent.env
 set +a
-uvicorn backend.agent:app --host 0.0.0.0 --port 9100
+./bin/nodesentinel agent
 ```
 
 Test the agent:
@@ -506,9 +498,12 @@ The project was renamed to NodeSentinel. Existing installations keep working:
   `COMPOSE_PROJECT_NAME` to the previous project name before redeploying.
   The container-internal state path is now `/opt/nodesentinel/state`. Agent
   certificates are mounted at `/etc/nodesentinel/certs` and, for existing
-  configurations, also at the previous certificate paths. The default config file name is
-  `nodesentinel.config.py`; set `NODESENTINEL_CONFIG_PATH` (or the older
-  `HOMELAB_CONFIG_PATH`) if your file has another name or location.
+  configurations, also at the previous certificate paths. The Go dashboard
+  reads JSON configuration; copy the required settings from an older
+  `nodesentinel.config.py` into `nodesentinel.config.json`, using
+  `nodesentinel.config.example.json` as a template. Python is not needed to run
+  the Go version. Set `NODESENTINEL_CONFIG_PATH` (or the older
+  `HOMELAB_CONFIG_PATH`) if the JSON file is elsewhere.
 - Images are now called `nodesentinel:local` and `nodesentinel-agent:local`.
 - Users must log in once again because the session cookie was renamed.
 - Native installs: systemd units, sudoers file and env file examples were
@@ -517,23 +512,28 @@ The project was renamed to NodeSentinel. Existing installations keep working:
 - In Dockhand, save and redeploy each stack after updating (edit, then save
   and deploy), so the new Compose files are used.
 
-### Updating to v2.2.1
+### Updating an existing installation
 
-Update the dashboard backend, frontend and agents together. Back up the
-dashboard state directory first, including its settings and SQLite databases.
-Keep the existing `.env` and `AGENT_URLS`; the environment-based configuration
-remains supported.
+Back up the dashboard state directory first, including its settings and both
+SQLite databases. The Go dashboard and agents keep the existing HTTP API,
+`settings.json`, `metrics.sqlite3` and `monitoring.sqlite3`, so dashboard
+settings and history do not need to be recreated. The Go dashboard uses JSON
+configuration; copy any required settings from a legacy Python configuration
+file into the JSON example. Alternatively, the environment-based `AGENT_URLS`
+configuration is still supported. No Python runtime or Python packages are
+needed for the Go version.
 
-Install the updated dependencies on the corresponding hosts:
+Build and install the single Go executable on each corresponding host:
 
 ```bash
-pip install -r backend/requirements-dashboard.txt
-pip install -r backend/requirements-agent.txt
+mkdir -p bin
+go build -o bin/nodesentinel ./cmd/nodesentinel
 ```
 
-Restart the dashboard and agent services after updating their files. Docker
-users can rebuild and recreate the corresponding Compose services instead.
-Verify the dashboard, agent connectivity and notification settings afterwards.
+Restart the dashboard and agent services after replacing the executable and
+systemd unit commands. Docker users can rebuild and recreate the corresponding
+Compose services instead. Verify login, agent connectivity, notification
+settings and existing history afterwards.
 
 ### Updating the Dashboard UI
 
@@ -632,12 +632,13 @@ samples are retained for approximately 25 hours. Run one dashboard worker only.
 
 ### Changing Ports
 
-**Dashboard port:** Change `--port 8888` in the dashboard startup command and systemd service. `DASHBOARD_PORT` in `.env` is informational; Uvicorn uses its command-line port.
+**Dashboard port:** Set `NODESENTINEL_DASHBOARD_PORT` in the environment or `bind_port` in the JSON dashboard config.
 
 **Agent port:**
-Update the agent startup command in the systemd service file:
+Set `NODESENTINEL_AGENT_PORT` in the agent environment file and update the
+dashboard agent URL. For host-network Compose overlays, set the same variable:
 ```ini
-ExecStart=/opt/nodesentinel/venv/bin/uvicorn backend.agent:app --host 0.0.0.0 --port 9100
+NODESENTINEL_AGENT_PORT=9100
 ```
 
 Then update all agent URLs in the dashboard `.env`.
@@ -723,16 +724,22 @@ the key and metrics travel in clear text, so enable HTTPS on agents outside
    chmod 600 agent.key
    ```
 
-2. Start the agent with TLS. Native: set `UVICORN_SSL_CERTFILE` and
-   `UVICORN_SSL_KEYFILE` in `/etc/nodesentinel-agent.env`. Docker Compose: add
+2. Start the agent with TLS. Native: set `NODESENTINEL_AGENT_TLS_CERTFILE` and
+   `NODESENTINEL_AGENT_TLS_KEYFILE` in `/etc/nodesentinel-agent.env`. Docker Compose: add
       `-f compose.agent.tls.yaml` and set `NODESENTINEL_AGENT_TLS_DIR` to the directory
    containing `agent.crt` and `agent.key`.
 3. Copy `agent.crt` (not the key) to the dashboard host and use an `https://`
    URL. With a config file, pin the certificate per agent:
 
-   ```python
-   AGENTS = {"HomeLab1": {"url": "https://homelab1.lan:9100",
-                          "ca_cert": "/opt/nodesentinel/certs/homelab1.crt"}}
+   ```json
+   {
+     "agents": {
+       "HomeLab1": {
+         "url": "https://homelab1.lan:9100",
+         "ca_cert": "/opt/nodesentinel/certs/homelab1.crt"
+       }
+     }
+   }
    ```
 
    With `AGENT_URLS`, set `AGENT_CA_CERT` to the certificate path. Certificates
@@ -745,8 +752,16 @@ config file, add `"key"` to the agent entry; agents without it use `AGENT_KEY`.
 To register a new agent, generate its key, set it as `NODESENTINEL_AGENT_KEY` on the
 agent and as `"key"` in the dashboard config entry.
 
-```python
-AGENTS = {"HomeLab1": {"url": "https://homelab1.lan:9100", "key": "unique-key-for-homelab1"}}
+```json
+{
+  "agents": {
+    "HomeLab1": {
+      "url": "https://homelab1.lan:9100",
+      "key": "unique-key-for-homelab1"
+    }
+  },
+  "agent_key": "shared-fallback-key"
+}
 ```
 
 ### Agent permissions
@@ -764,9 +779,10 @@ read-only and `no-new-privileges` is set. Enable only the sources you need.
 
 ### HTTPS for the dashboard behind a reverse proxy
 
-Run the dashboard on `127.0.0.1` (default `NODESENTINEL_BIND_ADDRESS`) and let the
-proxy terminate TLS. Start Uvicorn with `--proxy-headers
---forwarded-allow-ips PROXY-IP` so session cookies are marked `Secure`.
+Run the dashboard on `127.0.0.1` and let the proxy terminate TLS. Set
+`NODESENTINEL_TRUSTED_PROXIES` to the proxy's source IP or CIDR so the dashboard
+trusts its `X-Forwarded-Proto` header and marks session cookies `Secure`.
+Forwarded headers from other sources are ignored.
 
 Caddy (automatic certificates):
 
@@ -840,7 +856,10 @@ If the browser says the server cannot be found, first check DNS with `nslookup Y
 
 In Nginx Proxy Manager, forward using scheme `http`, the dashboard host's reachable IP and port `8888`, and select a trusted certificate for the subdomain. Verify port 443 is reachable and test `curl http://DASHBOARD-IP:8888/` from the proxy host. Within a container, `127.0.0.1` normally refers to the container, not the dashboard host.
 
-For TLS terminated on another host, configure Uvicorn with `--proxy-headers --forwarded-allow-ips PROXY-IP` using the actual trusted proxy source IP, so HTTPS cookies are marked `Secure`. Do not trust all forwarded-header sources. Restrict direct dashboard access with a firewall and restart the service after changing its systemd configuration.
+For TLS terminated on another host, configure `NODESENTINEL_TRUSTED_PROXIES`
+with the actual trusted proxy source IP/CIDR so HTTPS cookies are marked
+`Secure`. Do not trust all forwarded-header sources. Restrict direct dashboard
+access with a firewall and restart the service after changing its configuration.
 
 ---
 
@@ -944,14 +963,20 @@ NodeSentinel/
 ├── README.md                            # This file
 ├── .gitignore                           # Git ignore rules
 ├── .env.example                         # Dashboard config template
-├── nodesentinel-agent.env.example           # Agent config template
+├── nodesentinel-agent.env.example       # Agent config template
+├── go.mod / go.sum                      # Go module and dependency lock
+├── cmd/
+│   └── nodesentinel/
+│       ├── main.go                      # Dashboard/agent entry point
+│       ├── agent.go                     # Linux metrics and event API
+│       ├── dashboard.go                 # Dashboard HTTP API and storage
+│       ├── notify.go                    # Notification providers
+│       ├── monitor.go                   # History and monitoring workers
+│       └── nodesentinel_test.go         # Go service tests
 │
-├── dashboard_api.py                     # Dashboard web server
 ├── frontend/
 │   └── index.html                       # Web UI (HTML + inline CSS/JS)
-├── backend/
-│   ├── agent.py                         # Lightweight metrics agent
-│   └── test_dashboard.py                # Focused backend tests
+├── nodesentinel.config.example.json     # Dashboard configuration example
 │
 └── systemd/
     ├── nodesentinel.service.example         # Dashboard systemd service template

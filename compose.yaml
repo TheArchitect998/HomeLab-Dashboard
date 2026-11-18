@@ -7,13 +7,14 @@ services:
     restart: unless-stopped
     environment:
       TZ: "${NODESENTINEL_TIMEZONE:-${HOMELAB_TIMEZONE:-Etc/UTC}}"
-      NODESENTINEL_DASHBOARD_CONFIG: /etc/nodesentinel.py
+      NODESENTINEL_DASHBOARD_CONFIG: /etc/nodesentinel.json
+      NODESENTINEL_TRUSTED_PROXIES: "${NODESENTINEL_TRUSTED_PROXIES:-}"
     ports:
       - "${NODESENTINEL_BIND_ADDRESS:-${HOMELAB_BIND_ADDRESS:-127.0.0.1}}:${NODESENTINEL_PORT:-${HOMELAB_PORT:-8888}}:8888"
     volumes:
       - type: bind
-        source: "${NODESENTINEL_CONFIG_PATH:-${HOMELAB_CONFIG_PATH:-./nodesentinel.config.py}}"
-        target: /etc/nodesentinel.py
+        source: "${NODESENTINEL_CONFIG_PATH:-${HOMELAB_CONFIG_PATH:-./nodesentinel.config.json}}"
+        target: /etc/nodesentinel.json
         read_only: true
         bind:
           create_host_path: false

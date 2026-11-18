@@ -27,22 +27,17 @@ services:
     image: nodesentinel-agent:local
     restart: unless-stopped
     network_mode: host
-    command:
-      - uvicorn
-      - agent:app
-      - --host
-      - "${NODESENTINEL_AGENT_BIND_ADDRESS:-${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}}"
-      - --port
-      - "${NODESENTINEL_AGENT_PORT:-${HOMELAB_AGENT_PORT:-9100}}"
     environment:
       NODESENTINEL_AGENT_KEY: "${NODESENTINEL_AGENT_KEY:-${HOMELAB_AGENT_KEY:?Set NODESENTINEL_AGENT_KEY before starting the agent}}"
+      NODESENTINEL_AGENT_BIND_ADDRESS: "${NODESENTINEL_AGENT_BIND_ADDRESS:-${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}}"
+      NODESENTINEL_AGENT_PORT: "${NODESENTINEL_AGENT_PORT:-${HOMELAB_AGENT_PORT:-9100}}"
       NODESENTINEL_JOURNAL_DIR: "${NODESENTINEL_JOURNAL_DIR:-${HOMELAB_JOURNAL_DIR:?Set NODESENTINEL_JOURNAL_DIR, e.g. /host/root/var/log/journal/<machine-id>}}"
       NODESENTINEL_ENABLE_UFW: "${NODESENTINEL_ENABLE_UFW:-${HOMELAB_ENABLE_UFW:-1}}"
       NODESENTINEL_ENABLE_FAIL2BAN: "${NODESENTINEL_ENABLE_FAIL2BAN:-${HOMELAB_ENABLE_FAIL2BAN:-1}}"
       NODESENTINEL_FAIL2BAN_SOCKET: /host/root/run/fail2ban/fail2ban.sock
       NODESENTINEL_ENABLE_SMART: "${NODESENTINEL_ENABLE_SMART:-${HOMELAB_ENABLE_SMART:-1}}"
-      UVICORN_SSL_CERTFILE: /tls/agent.crt
-      UVICORN_SSL_KEYFILE: /tls/agent.key
+      NODESENTINEL_AGENT_TLS_CERTFILE: /tls/agent.crt
+      NODESENTINEL_AGENT_TLS_KEYFILE: /tls/agent.key
     cap_drop:
       - ALL
     cap_add:

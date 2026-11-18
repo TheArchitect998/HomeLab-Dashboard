@@ -7,7 +7,7 @@ Wants=network-online.target
 User=user
 WorkingDirectory=/opt/nodesentinel
 EnvironmentFile=/opt/nodesentinel/.env
-ExecStart=/opt/nodesentinel/venv/bin/uvicorn dashboard_api:app --host 0.0.0.0 --port 8888
+ExecStart=/opt/nodesentinel/bin/nodesentinel dashboard
 Restart=on-failure
 RestartSec=5
 
