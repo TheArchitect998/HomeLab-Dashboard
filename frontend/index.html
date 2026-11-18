@@ -213,17 +213,78 @@
 
       .dashboard-grid {
         display: grid;
-        grid-template-columns: repeat(12, minmax(0, 1fr));
+        grid-template-columns: repeat(48, minmax(0, 1fr));
+        grid-auto-rows: minmax(72px, auto);
         gap: 12px;
         align-items: start;
       }
 
-      .metrics-grid {
-        display: grid;
-        grid-column: span 9;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 12px;
+      .metric-card { grid-column: span 9; }
+      .hosts-panel { grid-column: span 12; }
+      .resource-panel, .containers-panel { grid-column: span 28; }
+      .temperature-panel, .side-panel { grid-column: span 20; }
+
+      .layout-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-bottom: 10px;
       }
+
+      .layout-toolbar button {
+        min-height: 32px;
+        padding: 5px 10px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        background: var(--surface);
+        color: var(--text);
+        cursor: pointer;
+      }
+
+      .layout-toolbar button[aria-pressed="true"] { border-color: var(--blue); color: var(--blue); }
+      .layout-toolbar .layout-help { margin-right: auto; color: var(--muted); font-size: calc(10px * var(--font-scale, 1.2)); }
+      .layout-widget { position: relative; }
+      .layout-drag-handle, .layout-resize-handle { display: none; }
+      .layout-editing .layout-widget { outline: 1px dashed var(--blue); outline-offset: -2px; }
+      .layout-editing .layout-widget > .panel-heading,
+      .layout-editing .layout-widget > .metric-head { cursor: grab; }
+      .layout-editing .layout-widget.layout-moving { opacity: 0.55; }
+      .layout-editing .layout-drag-handle {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+        width: 25px;
+        height: 25px;
+        padding: 0;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: var(--surface-raised);
+        color: var(--muted);
+        cursor: grab;
+        touch-action: none;
+      }
+      .layout-editing .layout-resize-handle {
+        position: absolute;
+        z-index: 2;
+        right: 2px;
+        bottom: 2px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 25px;
+        height: 25px;
+        padding: 0;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: var(--surface-raised);
+        color: var(--blue);
+        cursor: nwse-resize;
+        touch-action: none;
+      }
+      .layout-editing .layout-resizing { overflow: auto; }
+      .layout-widget.layout-custom-height { overflow: auto; }
 
       .panel, .metric-card {
         min-width: 0;
@@ -317,13 +378,6 @@
         color: var(--muted);
         font-size: calc(9px * var(--font-scale, 1.2));
       }
-
-      .hosts-panel { grid-column: span 3; }
-      .resource-panel { grid-column: span 7; }
-      .temperature-panel { grid-column: span 5; }
-      .containers-panel { grid-column: span 7; }
-      .side-stack { display: grid; grid-column: span 5; gap: 12px; }
-      .side-panel { grid-column: span 5; }
 
       .host-row {
         display: grid;
@@ -470,11 +524,7 @@
 
       @media (max-width: 1120px) {
         :root { --sidebar-width: 132px; }
-        .metrics-grid { grid-column: span 12; }
-        .hosts-panel { grid-column: span 12; }
         .hosts-panel .host-row { grid-template-columns: minmax(130px, 1fr) repeat(4, minmax(45px, auto)); }
-        .resource-panel, .temperature-panel { grid-column: span 6; }
-        .containers-panel, .side-stack, .side-panel { grid-column: span 6; }
       }
 
       @media (max-width: 720px) {
@@ -496,10 +546,11 @@
         .nav-link { min-height: 32px; flex: 0 0 auto; padding: 0 9px; }
         .sidebar-note { display: none; }
         .content { padding: 11px 10px 20px; }
-        .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
         .metric-card { min-height: 140px; padding: 11px 9px 8px; }
         .dashboard-grid { gap: 9px; }
-        .resource-panel, .temperature-panel, .containers-panel, .side-stack, .side-panel { grid-column: span 12; }
+        #app[data-current="overview"] > [data-layout-id] { grid-column: span 48 !important; }
+        #app[data-current="overview"] > .metric-card { grid-column: span 24 !important; }
+        #app:not([data-current="overview"]) > [data-section] { grid-column: 1 / -1 !important; }
         .chart-svg { height: 165px; }
         .topbar-meta { gap: 8px; }
         .topbar-meta .updated-label { display: none; }
@@ -513,6 +564,7 @@
         .language-select { max-width: 68px; padding-right: 3px; padding-left: 3px; }
         .system-state { max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
         .host-row { grid-template-columns: minmax(75px, 1fr) repeat(4, minmax(30px, auto)); gap: 5px; padding-right: 7px; padding-left: 7px; }
+        #app[data-current="overview"] > .metric-card { grid-column: span 48 !important; }
         th, td { padding-right: 7px; padding-left: 7px; }
       }
 
@@ -550,7 +602,7 @@
       #app[data-current="hosts"] > :not([data-section="hosts"]),
       #app[data-current="containers"] > :not([data-section="containers"]),
       #app[data-current="security"] > :not([data-section="security"]) { display: none; }
-      #app:not([data-current="overview"]) > [data-section] { grid-column: 1 / -1; }
+      #app:not([data-current="overview"]) > [data-section] { grid-column: 1 / -1 !important; height: auto !important; }
       .settings-grid { display: grid; gap: 12px; }
       .form-panel { padding: 16px; }
       .form-panel h2 { margin: 0 0 12px; font-size: calc(15px * var(--font-scale, 1.2)); }
@@ -657,6 +709,11 @@
 
       <main class="content" id="overview">
         <div id="error-banner" class="error-banner" role="status" hidden></div>
+        <div class="layout-toolbar" id="layout-toolbar" hidden>
+          <span class="layout-help" data-i18n="layoutHelp">Layout im Browser gespeichert</span>
+          <button type="button" id="layout-reset" data-i18n="resetLayout" hidden>Layout zurücksetzen</button>
+          <button type="button" id="layout-edit" aria-pressed="false" data-i18n="editLayout">Layout bearbeiten</button>
+        </div>
         <div id="app" class="dashboard-grid" aria-live="polite">
           <section class="panel" style="grid-column: 1 / -1; padding: 18px; color: var(--muted)">
             <span data-i18n="dashboardLoading">Dashboard wird geladen …</span>
@@ -886,6 +943,10 @@
       let latestUpdatedAt = null;
       let historyData = null;
       let historyRequest = 0;
+      const dashboardLayoutKey = 'homelab-dashboard-layout:v1';
+      let dashboardLayout = {};
+      let layoutEditing = false;
+      let layoutPointer = null;
 
       const translations = {
         de: {
@@ -900,6 +961,12 @@
           hosts: 'Hosts',
           containers: 'Container',
           security: 'Sicherheit',
+          editLayout: 'Layout bearbeiten',
+          finishLayout: 'Fertig',
+          resetLayout: 'Layout zurücksetzen',
+          layoutHelp: 'Felder verschieben oder unten rechts in der Größe ändern. Layout wird in diesem Browser gespeichert.',
+          moveWidget: 'Feld verschieben',
+          resizeWidget: 'Feldgröße ändern',
           pollInterval: 'Abfrage alle 15 Sekunden',
           dashboardLoading: 'Dashboard wird geladen …',
           author: 'Autor',
@@ -970,6 +1037,12 @@
           hosts: 'Hosts',
           containers: 'Containers',
           security: 'Security',
+          editLayout: 'Edit layout',
+          finishLayout: 'Done',
+          resetLayout: 'Reset layout',
+          layoutHelp: 'Drag fields to move them or use the lower-right corner to resize. Layout is saved in this browser.',
+          moveWidget: 'Move field',
+          resizeWidget: 'Resize field',
           pollInterval: 'Refresh every 15 seconds',
           dashboardLoading: 'Loading dashboard …',
           author: 'Author',
@@ -1040,6 +1113,12 @@
           hosts: 'Hôtes',
           containers: 'Conteneurs',
           security: 'Sécurité',
+          editLayout: 'Modifier la disposition',
+          finishLayout: 'Terminé',
+          resetLayout: 'Réinitialiser la disposition',
+          layoutHelp: 'Déplacez les champs ou redimensionnez-les par le coin inférieur droit. La disposition est enregistrée dans ce navigateur.',
+          moveWidget: 'Déplacer le champ',
+          resizeWidget: 'Redimensionner le champ',
           pollInterval: 'Actualisation toutes les 15 secondes',
           dashboardLoading: 'Chargement du tableau de bord …',
           author: 'Auteur',
@@ -1360,7 +1439,7 @@
 
       function renderMetric(type, label, value, caption, foot) {
         const trend = type === 'temperature' ? 'temperature' : type;
-        return `<section class="metric-card" data-metric="${type}">
+        return `<section class="metric-card" data-metric="${type}" data-layout-id="metric-${type}">
           <div class="metric-head">
             <span class="metric-icon">${iconSvg(type)}</span>
             <span class="metric-label">${label}</span>
@@ -1421,7 +1500,7 @@
           return `<path class="chart-line" d="${shiftedPath}" stroke="${item.color}"></path>${markers}${gaps}`;
         }).join('');
 
-        return `<section class="panel ${options.className || ''}">
+        return `<section class="panel ${options.className || ''}" data-layout-id="${escapeHtml(options.layoutId || options.className || 'chart')}">
           <div class="panel-heading">
             <h2 class="panel-title">${title}</h2>
             ${legend(series.map((item) => [item.label, item.color]))}
@@ -1577,6 +1656,194 @@
         return sample;
       }
 
+      function loadDashboardLayout() {
+        const saved = localStorage.getItem(dashboardLayoutKey);
+        if (!saved) return {};
+        try {
+          const parsed = JSON.parse(saved);
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid layout data');
+          return parsed;
+        } catch (error) {
+          console.error('Could not load dashboard layout:', error);
+          return {};
+        }
+      }
+
+      function defaultWidgetColumns(widget) {
+        const width = document.querySelector('#overview').clientWidth;
+        if (width <= 720) return widget.matches('.metric-card') ? (width <= 420 ? 48 : 24) : 48;
+        if (width <= 1120) {
+          if (widget.matches('.metric-card')) return 12;
+          if (widget.matches('.hosts-panel')) return 48;
+          return 24;
+        }
+        if (widget.matches('.metric-card')) return 9;
+        if (widget.matches('.hosts-panel')) return 12;
+        if (widget.matches('.resource-panel, .containers-panel')) return 28;
+        return 20;
+      }
+
+      function saveDashboardLayout() {
+        const widgets = [...document.querySelectorAll('#app > [data-layout-id]')];
+        dashboardLayout = Object.fromEntries(widgets.map((widget, order) => {
+          const entry = {
+            order,
+            columns: Number(widget.dataset.layoutColumns) || defaultWidgetColumns(widget)
+          };
+          if (widget.style.height) entry.height = Math.round(widget.getBoundingClientRect().height);
+          return [widget.dataset.layoutId, entry];
+        }));
+        try {
+          localStorage.setItem(dashboardLayoutKey, JSON.stringify(dashboardLayout));
+        } catch (error) {
+          console.error('Could not save dashboard layout:', error);
+        }
+      }
+
+      function applyDashboardLayout() {
+        const app = document.querySelector('#app');
+        const widgets = [...app.children].filter((widget) => widget.dataset.layoutId);
+        widgets.forEach((widget, index) => {
+          widget.classList.add('layout-widget');
+          const saved = dashboardLayout[widget.dataset.layoutId] || {};
+          const columns = Number.isInteger(saved.columns) ? Math.min(48, Math.max(4, saved.columns)) : defaultWidgetColumns(widget);
+          widget.dataset.layoutColumns = String(columns);
+          widget.style.gridColumn = `span ${columns}`;
+          widget.style.order = String(Number.isInteger(saved.order) ? saved.order : index);
+          if (Number.isFinite(saved.height) && saved.height >= 80 && saved.height <= 2000) {
+            widget.style.height = `${Math.round(saved.height)}px`;
+            widget.classList.add('layout-resizing');
+            widget.classList.add('layout-custom-height');
+          } else {
+            widget.style.removeProperty('height');
+            widget.classList.remove('layout-resizing');
+            widget.classList.remove('layout-custom-height');
+          }
+
+          let heading = widget.querySelector(':scope > .panel-heading, :scope > .metric-head');
+          if (heading && !heading.querySelector(':scope > .layout-drag-handle')) {
+            const dragHandle = document.createElement('button');
+            dragHandle.type = 'button';
+            dragHandle.className = 'layout-drag-handle';
+            dragHandle.dataset.layoutDrag = '';
+            dragHandle.setAttribute('aria-label', t('moveWidget'));
+            dragHandle.setAttribute('aria-keyshortcuts', 'ArrowUp ArrowDown ArrowLeft ArrowRight');
+            dragHandle.textContent = '⠿';
+            heading.prepend(dragHandle);
+          }
+          if (!widget.querySelector(':scope > .layout-resize-handle')) {
+            const resizeHandle = document.createElement('button');
+            resizeHandle.type = 'button';
+            resizeHandle.className = 'layout-resize-handle';
+            resizeHandle.dataset.layoutResize = '';
+            resizeHandle.setAttribute('aria-label', t('resizeWidget'));
+            resizeHandle.textContent = '↘';
+            widget.append(resizeHandle);
+          }
+          widget.querySelectorAll('.layout-drag-handle, .layout-resize-handle').forEach((handle) => {
+            handle.hidden = !layoutEditing;
+          });
+        });
+        const editing = layoutEditing && app.dataset.current === 'overview';
+        app.classList.toggle('layout-editing', editing);
+        app.querySelectorAll('.layout-drag-handle, .layout-resize-handle').forEach((handle) => {
+          handle.hidden = !editing;
+        });
+        document.querySelector('#layout-edit').textContent = t(layoutEditing ? 'finishLayout' : 'editLayout');
+        document.querySelector('#layout-edit').setAttribute('aria-pressed', String(layoutEditing));
+        document.querySelector('#layout-reset').hidden = !layoutEditing;
+      }
+
+      function finishLayoutInteraction() {
+        if (!layoutPointer) return;
+        layoutPointer.widget.classList.remove('layout-moving', 'layout-resizing');
+        layoutPointer = null;
+        saveDashboardLayout();
+      }
+
+      function setupLayoutInteractions() {
+        const app = document.querySelector('#app');
+        app.addEventListener('pointerdown', (event) => {
+          if (!layoutEditing || event.button !== 0) return;
+          const dragHandle = event.target.closest('[data-layout-drag]');
+          const resizeHandle = event.target.closest('[data-layout-resize]');
+          if (!dragHandle && !resizeHandle) return;
+          const widget = event.target.closest('[data-layout-id]');
+          if (!widget) return;
+          event.preventDefault();
+          layoutPointer = {
+            type: resizeHandle ? 'resize' : 'move',
+            widget,
+            startX: event.clientX,
+            startY: event.clientY,
+            startColumns: Number(widget.dataset.layoutColumns) || defaultWidgetColumns(widget),
+            startHeight: widget.getBoundingClientRect().height
+          };
+          widget.classList.add(resizeHandle ? 'layout-resizing' : 'layout-moving');
+          event.target.setPointerCapture(event.pointerId);
+        });
+        document.addEventListener('pointermove', (event) => {
+          if (!layoutPointer) return;
+          if (layoutPointer.type === 'resize') {
+            const widthStep = app.getBoundingClientRect().width / 12;
+            const columnSteps = Math.round((event.clientX - layoutPointer.startX) / widthStep);
+            const columns = Math.min(48, Math.max(4, layoutPointer.startColumns + columnSteps * 4));
+            const heightSteps = Math.round((event.clientY - layoutPointer.startY) / 96);
+            layoutPointer.widget.dataset.layoutColumns = String(columns);
+            layoutPointer.widget.style.gridColumn = `span ${columns}`;
+            layoutPointer.widget.style.height = `${Math.min(2000, Math.max(80, layoutPointer.startHeight + heightSteps * 96))}px`;
+            layoutPointer.widget.style.overflow = 'auto';
+            layoutPointer.widget.classList.add('layout-custom-height');
+            return;
+          }
+          const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-layout-id]');
+          if (!target || target === layoutPointer.widget || target.parentElement !== app) return;
+          const rect = target.getBoundingClientRect();
+          const before = event.clientY < rect.top + rect.height / 2
+            || (event.clientY < rect.bottom && event.clientX < rect.left + rect.width / 2);
+          app.insertBefore(layoutPointer.widget, before ? target : target.nextSibling);
+          [...app.children].filter((widget) => widget.dataset.layoutId)
+            .forEach((widget, index) => { widget.style.order = String(index); });
+        });
+        document.addEventListener('pointerup', finishLayoutInteraction);
+        document.addEventListener('pointercancel', finishLayoutInteraction);
+        app.addEventListener('keydown', (event) => {
+          if (!layoutEditing) return;
+          const widget = event.target.closest('[data-layout-id]');
+          if (!widget) return;
+          if (event.target.matches('[data-layout-drag]')) {
+            const widgets = [...app.children].filter((item) => item.dataset.layoutId);
+            const index = widgets.indexOf(widget);
+            const before = event.key === 'ArrowLeft' || event.key === 'ArrowUp';
+            const after = event.key === 'ArrowRight' || event.key === 'ArrowDown';
+            if (!before && !after) return;
+            event.preventDefault();
+            if (before && index > 0) app.insertBefore(widget, widgets[index - 1]);
+            if (after && index < widgets.length - 1) app.insertBefore(widget, widgets[index + 2] || null);
+            [...app.children].filter((item) => item.dataset.layoutId)
+              .forEach((item, order) => { item.style.order = String(order); });
+            saveDashboardLayout();
+            return;
+          }
+          if (!event.target.matches('[data-layout-resize]')) return;
+          const columns = Number(widget.dataset.layoutColumns) || defaultWidgetColumns(widget);
+          if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            const next = Math.min(48, Math.max(4, columns + (event.key === 'ArrowRight' ? 4 : -4)));
+            widget.dataset.layoutColumns = String(next);
+            widget.style.gridColumn = `span ${next}`;
+          } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            event.preventDefault();
+            const height = widget.getBoundingClientRect().height;
+            widget.style.height = `${Math.min(2000, Math.max(80, height + (event.key === 'ArrowDown' ? 96 : -96)))}px`;
+            widget.style.overflow = 'auto';
+            widget.classList.add('layout-resizing');
+            widget.classList.add('layout-custom-height');
+          } else return;
+          saveDashboardLayout();
+        });
+      }
+
       function renderDashboard(hosts, sample = addHistory(hosts)) {
         const detailStates = new Map([...document.querySelectorAll('#security details')].map((detail) =>
           [JSON.stringify([detail.closest('[data-host]').dataset.host, detail.dataset.detail]), detail.open]));
@@ -1599,8 +1866,8 @@
         systemState.style.color = onlineCount === names.length && names.length ? 'var(--cyan)' : 'var(--amber)';
 
         document.querySelector('#app').innerHTML = `
-          <div class="metrics-grid">${metricCards}</div>
-          <section class="panel hosts-panel" id="hosts" data-section="hosts">
+          ${metricCards}
+          <section class="panel hosts-panel" id="hosts" data-section="hosts" data-layout-id="hosts">
             <div class="panel-heading"><h2 class="panel-title">${t('hosts')}</h2><span class="panel-meta">${t('hostsOnline', { count: onlineCount })}</span></div>
             ${renderHostRows(hosts)}
           </section>
@@ -1608,11 +1875,11 @@
             { label: t('cpu'), color: colors.cpu, values: chartHistory.cpu },
             { label: t('ram'), color: colors.ram, values: chartHistory.ram },
             { label: t('disk'), color: colors.disk, values: chartHistory.disk }
-          ], { className: 'resource-panel' })}
+          ], { className: 'resource-panel', layoutId: 'chart-resources' })}
           ${renderChart(t('temperatureTrend'), [
             { label: t('temperature'), color: colors.temperature, values: chartHistory.temperature }
-          ], { className: 'temperature-panel', max: 60, ticks: [20, 30, 40, 50, 60], suffix: '°' })}
-          ${Object.entries(hosts).map(([name, host]) => `<section class="panel containers-panel" data-section="containers">
+          ], { className: 'temperature-panel', layoutId: 'chart-temperature', max: 60, ticks: [20, 30, 40, 50, 60], suffix: '°' })}
+          ${Object.entries(hosts).map(([name, host]) => `<section class="panel containers-panel" data-section="containers" data-layout-id="containers-${encodeURIComponent(name)}">
             <div class="panel-heading">
               <h2 class="panel-title">${t('containerServices')} · ${escapeHtml(name)}</h2>
               <span class="panel-meta">${host.online ? t('online') : t('offline')}</span>
@@ -1624,27 +1891,28 @@
               </table>
             </div>
           </section>`).join('')}
-          ${Object.entries(hosts).map(([name, host]) => `<section class="panel side-panel" data-section="hosts">
+          ${Object.entries(hosts).map(([name, host]) => `<section class="panel side-panel" data-section="hosts" data-layout-id="hardware-${encodeURIComponent(name)}">
             <div class="panel-heading">
               <h2 class="panel-title">${t('hardware')} · ${escapeHtml(name)}</h2>
               <span class="panel-meta">${host.online ? t('online') : t('offline')}</span>
             </div>
             ${host.online ? renderHardware(host) : `<div class="empty-row">${t('hostUnreachable')}</div>`}
           </section>`).join('')}
-            <section class="panel side-panel">
+            <section class="panel side-panel" data-layout-id="host-resources">
               <div class="panel-heading">
                 <h2 class="panel-title">${t('hostResources')}</h2>
                 ${legend([[t('cpu'), colors.cpu], [t('ram'), colors.ram]])}
               </div>
               <div class="resource-list">${renderHostResources(hosts)}</div>
             </section>
-            <section class="panel side-panel" id="security" data-section="security">
+            <section class="panel side-panel" id="security" data-section="security" data-layout-id="security">
               <div class="panel-heading">
                 <h2 class="panel-title">${t('securityStatus')}</h2>
                 <span class="panel-meta">UFW · Fail2Ban</span>
               </div>
               <div class="security-content">${renderSecurity(hosts)}</div>
             </section>`;
+        applyDashboardLayout();
         document.querySelectorAll('#security details').forEach((detail) => {
           const key = JSON.stringify([detail.closest('[data-host]').dataset.host, detail.dataset.detail]);
           const saved = sessionStorage.getItem(`homelab-security:${location.hash || '#overview'}:${key}`);
@@ -1719,8 +1987,18 @@
       function applyView() {
         const view = location.hash.slice(1);
         const current = ['hosts', 'containers', 'security', 'history', 'checks', 'notifications', 'settings'].includes(view) ? view : 'overview';
-        document.querySelector('#app').dataset.current = current;
-        document.querySelector('#app').hidden = ['settings', 'notifications', 'history', 'checks'].includes(current);
+        const app = document.querySelector('#app');
+        app.dataset.current = current;
+        app.hidden = ['settings', 'notifications', 'history', 'checks'].includes(current);
+        document.querySelector('#layout-toolbar').hidden = !authenticated || current !== 'overview';
+        const editing = layoutEditing && current === 'overview';
+        app.classList.toggle('layout-editing', editing);
+        app.querySelectorAll('.layout-drag-handle, .layout-resize-handle').forEach((handle) => {
+          handle.hidden = !editing;
+        });
+        document.querySelector('#layout-edit').textContent = t(layoutEditing ? 'finishLayout' : 'editLayout');
+        document.querySelector('#layout-edit').setAttribute('aria-pressed', String(layoutEditing));
+        document.querySelector('#layout-reset').hidden = !layoutEditing || current !== 'overview';
         document.querySelector('#checks-page').hidden = current !== 'checks';
         document.querySelector('#settings-page').hidden = current !== 'settings';
         document.querySelector('#notifications-page').hidden = current !== 'notifications';
@@ -2171,6 +2449,25 @@
       document.querySelector('#app').addEventListener('toggle', (event) => {
         if (event.target.matches('#security details') && event.target.isConnected) saveSecurityDetail(event.target);
       }, true);
+
+      dashboardLayout = loadDashboardLayout();
+      setupLayoutInteractions();
+      window.addEventListener('resize', () => {
+        if (latestDashboard) applyDashboardLayout();
+      });
+      document.querySelector('#layout-edit').addEventListener('click', () => {
+        layoutEditing = !layoutEditing;
+        applyDashboardLayout();
+      });
+      document.querySelector('#layout-reset').addEventListener('click', () => {
+        dashboardLayout = {};
+        try {
+          localStorage.removeItem(dashboardLayoutKey);
+        } catch (error) {
+          console.error('Could not reset dashboard layout:', error);
+        }
+        applyDashboardLayout();
+      });
 
       document.querySelector('#language-select').addEventListener('change', (event) => {
         currentLanguage = event.target.value;

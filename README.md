@@ -44,6 +44,7 @@ The screenshot uses synthetic example data.
 - Telegram, Discord, Ntfy, Pushover, e-mail (SMTP), webhook and Gotify notifications
 - Per-host temperature alerts and a daily report with a configurable time
 - Password-protected dashboard and optional agent authentication
+- Customizable overview: move and resize panels; layout is saved in the browser
 - German, English and French interface; light and dark themes
 - Native Linux or Docker deployment on AMD64 and ARM64
 
