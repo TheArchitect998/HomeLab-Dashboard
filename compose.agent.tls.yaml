@@ -1,6 +1,6 @@
 # Overlay that makes the agent serve HTTPS. Combine with an agent Compose file:
 #   docker compose -f compose.agent.yaml -f compose.agent.tls.yaml up -d
-# HOMELAB_AGENT_TLS_DIR must contain agent.crt and agent.key.
+# LABGUARD_AGENT_TLS_DIR (legacy HOMELAB_AGENT_TLS_DIR) must contain agent.crt and agent.key.
 services:
   agent:
     environment:
@@ -8,7 +8,7 @@ services:
       UVICORN_SSL_KEYFILE: /tls/agent.key
     volumes:
       - type: bind
-        source: "${HOMELAB_AGENT_TLS_DIR:?Set HOMELAB_AGENT_TLS_DIR to the directory with agent.crt and agent.key}"
+        source: "${LABGUARD_AGENT_TLS_DIR:-${HOMELAB_AGENT_TLS_DIR:?Set LABGUARD_AGENT_TLS_DIR to the directory with agent.crt and agent.key}}"
         target: /tls
         read_only: true
         bind:

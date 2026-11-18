@@ -4,15 +4,16 @@
 #   docker compose -f compose.agent.full.yaml up -d --build
 #
 # Required variables (e.g. in .env):
-#   HOMELAB_AGENT_KEY         at least 16 random characters
-#   HOMELAB_AGENT_TLS_DIR     directory with agent.crt and agent.key
-#   HOMELAB_JOURNAL_DIR       journal directory as seen in the container, e.g.
+#   LABGUARD_AGENT_KEY        at least 16 random characters
+#   LABGUARD_AGENT_TLS_DIR    directory with agent.crt and agent.key
+#   LABGUARD_JOURNAL_DIR      journal directory as seen in the container, e.g.
 #                             /host/root/var/log/journal/<machine-id>
 # Optional variables:
-#   HOMELAB_AGENT_BIND_ADDRESS (default 127.0.0.1), HOMELAB_AGENT_PORT (9100)
-#   HOMELAB_ENABLE_UFW (1), HOMELAB_ENABLE_FAIL2BAN (1), HOMELAB_ENABLE_SMART (1)
-#   HOMELAB_SMART_DEVICE      disk to read S.M.A.R.T. from (default /dev/sda);
+#   LABGUARD_AGENT_BIND_ADDRESS (default 127.0.0.1), LABGUARD_AGENT_PORT (9100)
+#   LABGUARD_ENABLE_UFW (1), LABGUARD_ENABLE_FAIL2BAN (1), LABGUARD_ENABLE_SMART (1)
+#   LABGUARD_SMART_DEVICE     disk to read S.M.A.R.T. from (default /dev/sda);
 #                             the device must exist on the host
+# The legacy HOMELAB_* names are still accepted as fallback.
 # Security notes: NET_ADMIN allows firewall changes, SYS_RAWIO allows raw disk
 # commands, the Docker socket is effectively host root, and the journal and the
 # Fail2Ban socket expose sensitive data. Disable what you do not need.
@@ -21,23 +22,23 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.agent
-    image: homelab-agent:local
+    image: labguard-agent:local
     restart: unless-stopped
     network_mode: host
     command:
       - uvicorn
       - agent:app
       - --host
-      - "${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}"
+      - "${LABGUARD_AGENT_BIND_ADDRESS:-${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}}"
       - --port
-      - "${HOMELAB_AGENT_PORT:-9100}"
+      - "${LABGUARD_AGENT_PORT:-${HOMELAB_AGENT_PORT:-9100}}"
     environment:
-      HOMELAB_AGENT_KEY: "${HOMELAB_AGENT_KEY:?Set HOMELAB_AGENT_KEY before starting the agent}"
-      HOMELAB_JOURNAL_DIR: "${HOMELAB_JOURNAL_DIR:?Set HOMELAB_JOURNAL_DIR, e.g. /host/root/var/log/journal/<machine-id>}"
-      HOMELAB_ENABLE_UFW: "${HOMELAB_ENABLE_UFW:-1}"
-      HOMELAB_ENABLE_FAIL2BAN: "${HOMELAB_ENABLE_FAIL2BAN:-1}"
-      HOMELAB_FAIL2BAN_SOCKET: /host/root/run/fail2ban/fail2ban.sock
-      HOMELAB_ENABLE_SMART: "${HOMELAB_ENABLE_SMART:-1}"
+      LABGUARD_AGENT_KEY: "${LABGUARD_AGENT_KEY:-${HOMELAB_AGENT_KEY:?Set LABGUARD_AGENT_KEY before starting the agent}}"
+      LABGUARD_JOURNAL_DIR: "${LABGUARD_JOURNAL_DIR:-${HOMELAB_JOURNAL_DIR:?Set LABGUARD_JOURNAL_DIR, e.g. /host/root/var/log/journal/<machine-id>}}"
+      LABGUARD_ENABLE_UFW: "${LABGUARD_ENABLE_UFW:-${HOMELAB_ENABLE_UFW:-1}}"
+      LABGUARD_ENABLE_FAIL2BAN: "${LABGUARD_ENABLE_FAIL2BAN:-${HOMELAB_ENABLE_FAIL2BAN:-1}}"
+      LABGUARD_FAIL2BAN_SOCKET: /host/root/run/fail2ban/fail2ban.sock
+      LABGUARD_ENABLE_SMART: "${LABGUARD_ENABLE_SMART:-${HOMELAB_ENABLE_SMART:-1}}"
       UVICORN_SSL_CERTFILE: /tls/agent.crt
       UVICORN_SSL_KEYFILE: /tls/agent.key
     cap_drop:
@@ -52,7 +53,7 @@ services:
       - /tmp
       - /run
     devices:
-      - "${HOMELAB_SMART_DEVICE:-/dev/sda}:${HOMELAB_SMART_DEVICE:-/dev/sda}"
+      - "${LABGUARD_SMART_DEVICE:-${HOMELAB_SMART_DEVICE:-/dev/sda}}:${LABGUARD_SMART_DEVICE:-${HOMELAB_SMART_DEVICE:-/dev/sda}}"
     volumes:
       - type: bind
         source: /proc
@@ -79,7 +80,7 @@ services:
         bind:
           create_host_path: false
       - type: bind
-        source: "${HOMELAB_AGENT_TLS_DIR:?Set HOMELAB_AGENT_TLS_DIR to the directory with agent.crt and agent.key}"
+        source: "${LABGUARD_AGENT_TLS_DIR:-${HOMELAB_AGENT_TLS_DIR:?Set LABGUARD_AGENT_TLS_DIR to the directory with agent.crt and agent.key}}"
         target: /tls
         read_only: true
         bind:

@@ -4,7 +4,7 @@
 services:
   agent:
     environment:
-      HOMELAB_ENABLE_SMART: "1"
+      LABGUARD_ENABLE_SMART: "1"
     cap_add:
       - SYS_RAWIO
     devices:

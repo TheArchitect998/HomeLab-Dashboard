@@ -1,6 +1,8 @@
 # Standalone dashboard Compose file with read-only agent certificate access.
-# Set HOMELAB_AGENT_CERTS_DIR to a host directory containing only public
-# certificates, then use /etc/homelab-dashboard/certs/<filename> in ca_cert.
+# Set LABGUARD_AGENT_CERTS_DIR (legacy HOMELAB_AGENT_CERTS_DIR also works) to a
+# host directory containing only public certificates, then use
+# /etc/labguard/certs/<filename> in ca_cert. The legacy path
+# /etc/homelab-dashboard/certs stays mounted for existing configs.
 services:
   dashboard:
     extends:
@@ -8,7 +10,13 @@ services:
       service: dashboard
     volumes:
       - type: bind
-        source: "${HOMELAB_AGENT_CERTS_DIR:?Set HOMELAB_AGENT_CERTS_DIR to a directory of public certificates}"
+        source: "${LABGUARD_AGENT_CERTS_DIR:-${HOMELAB_AGENT_CERTS_DIR:?Set LABGUARD_AGENT_CERTS_DIR to a directory of public certificates}}"
+        target: /etc/labguard/certs
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${LABGUARD_AGENT_CERTS_DIR:-${HOMELAB_AGENT_CERTS_DIR:?Set LABGUARD_AGENT_CERTS_DIR to a directory of public certificates}}"
         target: /etc/homelab-dashboard/certs
         read_only: true
         bind:

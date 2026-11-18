@@ -2,9 +2,9 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    HOMELAB_AGENT_CONTAINER=1
+    LABGUARD_AGENT_CONTAINER=1
 
-WORKDIR /opt/homelab-agent
+WORKDIR /opt/labguard-agent
 RUN apt-get update \
     && apt-get install -y --no-install-recommends docker-cli systemd ufw fail2ban smartmontools \
     && rm -rf /var/lib/apt/lists/*

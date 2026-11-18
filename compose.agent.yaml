@@ -3,13 +3,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.agent
-    image: homelab-agent:local
+    image: labguard-agent:local
     restart: unless-stopped
     environment:
-      HOMELAB_AGENT_KEY: "${HOMELAB_AGENT_KEY:?Set HOMELAB_AGENT_KEY before starting the agent}"
-      HOMELAB_JOURNAL_DIR: "${HOMELAB_JOURNAL_DIR:-}"
+      LABGUARD_AGENT_KEY: "${LABGUARD_AGENT_KEY:-${HOMELAB_AGENT_KEY:?Set LABGUARD_AGENT_KEY before starting the agent}}"
+      LABGUARD_JOURNAL_DIR: "${LABGUARD_JOURNAL_DIR:-${HOMELAB_JOURNAL_DIR:-}}"
     ports:
-      - "${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}:${HOMELAB_AGENT_PORT:-9100}:9100"
+      - "${LABGUARD_AGENT_BIND_ADDRESS:-${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}}:${LABGUARD_AGENT_PORT:-${HOMELAB_AGENT_PORT:-9100}}:9100"
     cap_drop:
       - ALL
     security_opt:

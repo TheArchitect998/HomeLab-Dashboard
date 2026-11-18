@@ -1,7 +1,0 @@
-Cmnd_Alias HOMELAB_READONLY = /usr/bin/ufw status, /usr/bin/fail2ban-client status, /usr/bin/fail2ban-client status *
-user ALL=(root) NOPASSWD: HOMELAB_READONLY
-
-# Optional S.M.A.R.T. access (set HOMELAB_ENABLE_SMART=1 in /etc/homelab-agent.env).
-# Uncomment both lines. The wildcards also match extra smartctl options, so grant this only on trusted hosts.
-# Cmnd_Alias HOMELAB_SMART = /usr/sbin/smartctl --scan -j, /usr/sbin/smartctl -j -H -A -n standby /dev/*, /usr/sbin/smartctl -j -H -A -n standby -d * /dev/*
-# user ALL=(root) NOPASSWD: HOMELAB_SMART

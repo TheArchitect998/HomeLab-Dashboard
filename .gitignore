@@ -16,5 +16,6 @@ __pycache__/
 .DS_Store
 *.swp
 *.swo
+/labguard.config.py
 /homelab-dashboard.config.py
 /Planung.txt

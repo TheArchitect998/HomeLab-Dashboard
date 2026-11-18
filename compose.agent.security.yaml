@@ -13,13 +13,13 @@ services:
       - uvicorn
       - agent:app
       - --host
-      - "${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}"
+      - "${LABGUARD_AGENT_BIND_ADDRESS:-${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}}"
       - --port
-      - "${HOMELAB_AGENT_PORT:-9100}"
+      - "${LABGUARD_AGENT_PORT:-${HOMELAB_AGENT_PORT:-9100}}"
     environment:
-      HOMELAB_ENABLE_UFW: "1"
-      HOMELAB_ENABLE_FAIL2BAN: "${HOMELAB_ENABLE_FAIL2BAN:-0}"
-      HOMELAB_FAIL2BAN_SOCKET: /host/root/run/fail2ban/fail2ban.sock
+      LABGUARD_ENABLE_UFW: "1"
+      LABGUARD_ENABLE_FAIL2BAN: "${LABGUARD_ENABLE_FAIL2BAN:-${HOMELAB_ENABLE_FAIL2BAN:-0}}"
+      LABGUARD_FAIL2BAN_SOCKET: /host/root/run/fail2ban/fail2ban.sock
     volumes:
       - type: bind
         source: /etc/ufw

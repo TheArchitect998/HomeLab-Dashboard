@@ -1,6 +1,6 @@
-# HomeLab Dashboard
+# LabGuard
 
-HomeLab Dashboard is a self-hosted monitoring dashboard for Linux hosts. It
+LabGuard is a self-hosted monitoring dashboard for Linux hosts. It
 provides system metrics, Docker and security information, persistent history,
 and notifications via Telegram, Discord, Ntfy, Pushover, e-mail (SMTP), generic
 webhooks and Gotify. Temperature alerts
@@ -32,7 +32,7 @@ and a daily report with a configurable time help you monitor your homelab.
 
 ## Features
 
-![HomeLab Dashboard overview](screenshots/dashboard-aktuell.png)
+![LabGuard overview](screenshots/dashboard-aktuell.png)
 
 The screenshot uses synthetic example data.
 
@@ -125,17 +125,17 @@ DASHBOARD_HOST=0.0.0.0
 DASHBOARD_PORT=8888
 AGENT_URLS='["http://pi-1.local:9100/api/metrics","http://pi-2.local:9100/api/metrics"]'
 AGENT_KEY=your-long-random-agent-key
-HOMELAB_STATE_DIR=/opt/homelab-dashboard/state
+LABGUARD_STATE_DIR=/opt/labguard/state
 ```
 
-`AGENT_KEY` must match `HOMELAB_AGENT_KEY` on each agent. Protect `.env` from other users. `AGENT_URLS` accepts the existing `/api/metrics` URLs or agent base URLs; names remain `agent-1`, `agent-2`, and so on.
+`AGENT_KEY` must match `LABGUARD_AGENT_KEY` on each agent. Protect `.env` from other users. `AGENT_URLS` accepts the existing `/api/metrics` URLs or agent base URLs; names remain `agent-1`, `agent-2`, and so on.
 
 ### 4. Set the first password locally
 
 The state directory must be writable only by the dashboard service user. Replace `user` with your actual service user:
 
 ```bash
-sudo install -d -o user -g user -m 0700 /opt/homelab-dashboard/state
+sudo install -d -o user -g user -m 0700 /opt/labguard/state
 sudo chown user:user .env
 sudo chmod 600 .env
 set -a
@@ -144,7 +144,7 @@ set +a
 python dashboard_api.py setup
 ```
 
-Set a password of at least 12 characters. For a service installation, run the setup command as the same user as the dashboard, with the same `HOMELAB_STATE_DIR`. The password can later be changed under Settings.
+Set a password of at least 12 characters. For a service installation, run the setup command as the same user as the dashboard, with the same `LABGUARD_STATE_DIR`. The password can later be changed under Settings.
 
 ### 5. Start dashboard
 
@@ -168,16 +168,16 @@ No prebuilt public image is required.
 ### Dashboard
 
 ```bash
-cp backend/config.example.py homelab-dashboard.config.py
+cp backend/config.example.py labguard.config.py
 ```
 
-Edit `homelab-dashboard.config.py`: set the agent addresses and a strong
+Edit `labguard.config.py`: set the agent addresses and a strong
 `AGENT_KEY` shared with the agents. Protect this file; it may contain secrets.
 The container runs as UID/GID 10001 and must be able to read it. Agent
 `127.0.0.1` addresses refer to the dashboard container itself.
 
-By default, Compose mounts `./homelab-dashboard.config.py` relative to the
-Compose project. Set `HOMELAB_CONFIG_PATH` to an absolute path on the Docker
+By default, Compose mounts `./labguard.config.py` relative to the
+Compose project. Set `LABGUARD_CONFIG_PATH` to an absolute path on the Docker
 host to use a protected configuration file elsewhere, for example when
 deploying a Git stack through Dockhand and Hawser. The file must already
 exist, and UID/GID 10001 must be able to traverse its parent directories and
@@ -190,8 +190,8 @@ docker compose up -d
 ```
 
 The dashboard listens on `127.0.0.1:8888` by default. Set
-`HOMELAB_BIND_ADDRESS` and optionally `HOMELAB_PORT` for a protected LAN.
-The default timezone is UTC; set `HOMELAB_TIMEZONE`, for example to
+`LABGUARD_BIND_ADDRESS` and optionally `LABGUARD_PORT` for a protected LAN.
+The default timezone is UTC; set `LABGUARD_TIMEZONE`, for example to
 `Europe/Berlin`, and recreate the container to change it.
 
 Settings and history are stored in the `dashboard-state` volume. Protect and
@@ -199,10 +199,11 @@ back up this volume. `docker compose down -v` deletes it.
 
 For agents using HTTPS with self-signed certificates, use
 `compose.dashboard.tls.yaml` instead of `compose.yaml`. Set
-`HOMELAB_AGENT_CERTS_DIR` to an existing host directory containing only public
+`LABGUARD_AGENT_CERTS_DIR` to an existing host directory containing only public
 agent or CA certificates, never private keys. The dashboard's UID/GID 10001
 must be able to traverse and read that directory. Configure each agent's
-`ca_cert` as `/etc/homelab-dashboard/certs/<filename>`. For example:
+`ca_cert` as `/etc/labguard/certs/<filename>` (the legacy path
+`/etc/homelab-dashboard/certs/<filename>` remains available). For example:
 
 ```bash
 docker compose -f compose.dashboard.tls.yaml up -d --build
@@ -217,8 +218,8 @@ On each monitored Linux host, create a protected `.env` file containing the
 same key as the dashboard:
 
 ```env
-HOMELAB_AGENT_KEY=replace-with-a-strong-random-key
-HOMELAB_AGENT_BIND_ADDRESS=127.0.0.1
+LABGUARD_AGENT_KEY=replace-with-a-strong-random-key
+LABGUARD_AGENT_BIND_ADDRESS=127.0.0.1
 ```
 
 ```bash
@@ -226,13 +227,13 @@ chmod 600 .env
 docker compose -f compose.agent.yaml up -d --build
 ```
 
-Set `HOMELAB_AGENT_BIND_ADDRESS` to a suitable LAN IP for remote dashboard
+Set `LABGUARD_AGENT_BIND_ADDRESS` to a suitable LAN IP for remote dashboard
 access and restrict port 9100 with the host firewall. Without TLS, agent
 communication is unencrypted; enable HTTPS (see
 [Encrypted agent communication](#encrypted-agent-communication)) or use an
 encrypted tunnel.
 
-The agent refuses to start without `HOMELAB_AGENT_KEY` of at least 16
+The agent refuses to start without `LABGUARD_AGENT_KEY` of at least 16
 characters (the example value `change-me` is rejected). Generate one with
 `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`.
 
@@ -251,7 +252,7 @@ Journal event collection and UFW and Fail2Ban status checks are disabled by
 default. The existing read-only host-root mount may nevertheless expose
 sensitive files, including system logs, to the container.
 
-For SSH and Fail2Ban events, set `HOMELAB_JOURNAL_DIR` to the host journal
+For SSH and Fail2Ban events, set `LABGUARD_JOURNAL_DIR` to the host journal
 directory as seen through the existing `/host/root` mount, for example
 `/host/root/var/log/journal/<machine-id>` or
 `/host/root/run/log/journal/<machine-id>`. Choose the directory on each host
@@ -262,20 +263,20 @@ Journal access exposes sensitive logs.
 For everything at once (HTTPS, journal, UFW, Fail2Ban, S.M.A.R.T., Docker),
 use the standalone `compose.agent.full.yaml` instead of the other agent files:
 `docker compose -f compose.agent.full.yaml up -d --build`. It requires
-`HOMELAB_AGENT_KEY`, `HOMELAB_AGENT_TLS_DIR` and `HOMELAB_JOURNAL_DIR`; the
+`LABGUARD_AGENT_KEY`, `LABGUARD_AGENT_TLS_DIR` and `LABGUARD_JOURNAL_DIR`; the
 header of the file lists all optional variables.
 
 For UFW status on Linux, `compose.agent.security.yaml` extends the standard
 agent configuration with host networking, `NET_ADMIN` and a read-only mount of
 host `/etc/ufw`. Select this file instead of `compose.agent.yaml`; it requires
 Docker Compose 2.24.4 or newer for `!reset`. The agent listens on
-`HOMELAB_AGENT_BIND_ADDRESS` and `HOMELAB_AGENT_PORT` directly on the host;
+`LABGUARD_AGENT_BIND_ADDRESS` and `LABGUARD_AGENT_PORT` directly on the host;
 the defaults are `127.0.0.1` and `9100`. Select a suitable host address and
 restrict access with the host firewall. `NET_ADMIN` allows changes to the host
 firewall; host networking and compatible UFW/iptables versions are required.
 
 To additionally enable Fail2Ban status with the security Compose file, set
-`HOMELAB_ENABLE_FAIL2BAN=1` on hosts running Fail2Ban. The agent connects to
+`LABGUARD_ENABLE_FAIL2BAN=1` on hosts running Fail2Ban. The agent connects to
 `/run/fail2ban/fail2ban.sock` through the existing host-root mount. Socket
 access allows administrative commands even with a read-only mount. The client
 in the image must be compatible with the host's Fail2Ban server. On hosts
@@ -295,15 +296,15 @@ interfaces are ignored. In the container agent, network counters describe the
 container's namespace unless host networking is used (`compose.agent.security.yaml`),
 and GPU/ZFS tools are not part of the image. Intel/AMD GPUs are not supported.
 
-S.M.A.R.T. is opt-in (`HOMELAB_ENABLE_SMART=1`) because it needs raw disk access.
+S.M.A.R.T. is opt-in (`LABGUARD_ENABLE_SMART=1`) because it needs raw disk access.
 Results are cached for 10 minutes and standby disks are not woken (`-n standby`).
 A failed health check, reallocated/pending/uncorrectable sectors, or an NVMe
 critical warning or media errors are shown as a warning. Not every USB adapter
 passes SMART commands through.
 
-- Native: install `smartmontools`, enable the commented `HOMELAB_SMART` lines in
-  `systemd/homelab-dashboard.sudoers` and set `HOMELAB_ENABLE_SMART=1` in
-  `/etc/homelab-agent.env`.
+- Native: install `smartmontools`, enable the commented `LABGUARD_SMART` lines in
+  `systemd/labguard.sudoers` and set `LABGUARD_ENABLE_SMART=1` in
+  `/etc/labguard-agent.env`.
 - Docker Compose: add `-f compose.agent.smart.yaml` after editing its device list;
   it adds `SYS_RAWIO` and maps the disks.
 
@@ -319,8 +320,8 @@ Dockerfile, image tag and `--push`.
 
 ```bash
 # Create application directory
-sudo mkdir -p /opt/homelab-dashboard
-cd /opt/homelab-dashboard
+sudo mkdir -p /opt/labguard
+cd /opt/labguard
 
 # Clone repository
 git clone https://github.com/TheArchitect998/HomeLab-Dashboard.git .
@@ -348,7 +349,7 @@ DASHBOARD_HOST=0.0.0.0
 DASHBOARD_PORT=8888
 AGENT_URLS='["http://192.168.1.100:9100/api/metrics","http://192.168.1.101:9100/api/metrics"]'
 AGENT_KEY=your-long-random-agent-key
-HOMELAB_STATE_DIR=/opt/homelab-dashboard/state
+LABGUARD_STATE_DIR=/opt/labguard/state
 ```
 
 Create the state directory and set the initial password as described in [Quick Start](#4-set-the-first-password-locally). Configure the same key on every agent.
@@ -375,8 +376,8 @@ Run these steps on **each monitored device** (Pi 2, NAS, etc.).
 
 ```bash
 # Create application directory (same path as dashboard)
-sudo mkdir -p /opt/homelab-dashboard
-cd /opt/homelab-dashboard
+sudo mkdir -p /opt/labguard
+cd /opt/labguard
 
 # Clone repository
 git clone https://github.com/TheArchitect998/HomeLab-Dashboard.git .
@@ -392,15 +393,15 @@ pip install fastapi uvicorn psutil
 
 ```bash
 # Copy example configuration
-cp homelab-agent.env.example homelab-agent.env
+cp labguard-agent.env.example labguard-agent.env
 
 # Edit with a secure key
-nano homelab-agent.env
+nano labguard-agent.env
 ```
 
 Set a strong key:
 ```env
-HOMELAB_AGENT_KEY=your-secure-random-key-here
+LABGUARD_AGENT_KEY=your-secure-random-key-here
 ```
 
 #### Step 3: Configure optional security access
@@ -409,8 +410,8 @@ To read UFW and Fail2Ban status, review the provided sudoers template and
 adjust its username and command paths for your host before installing it:
 
 ```bash
-sudo install -m 0440 systemd/homelab-dashboard.sudoers /etc/sudoers.d/homelab-dashboard
-sudo visudo -cf /etc/sudoers.d/homelab-dashboard
+sudo install -m 0440 systemd/labguard.sudoers /etc/sudoers.d/labguard
+sudo visudo -cf /etc/sudoers.d/labguard
 ```
 
 The template permits specific status commands rather than unrestricted access
@@ -423,14 +424,14 @@ logs can contain sensitive information.
 ```bash
 source venv/bin/activate
 set -a
-source homelab-agent.env
+source labguard-agent.env
 set +a
 uvicorn backend.agent:app --host 0.0.0.0 --port 9100
 ```
 
 Test the agent:
 ```bash
-curl -H "X-Agent-Key: $HOMELAB_AGENT_KEY" http://localhost:9100/api/metrics
+curl -H "X-Agent-Key: $LABGUARD_AGENT_KEY" http://localhost:9100/api/metrics
 ```
 
 ---
@@ -442,12 +443,12 @@ curl -H "X-Agent-Key: $HOMELAB_AGENT_KEY" http://localhost:9100/api/metrics
 Copy the example service file:
 
 ```bash
-sudo cp systemd/homelab-dashboard.service.example /etc/systemd/system/homelab-dashboard.service
+sudo cp systemd/labguard.service.example /etc/systemd/system/labguard.service
 ```
 
 Edit as needed:
 ```bash
-sudo nano /etc/systemd/system/homelab-dashboard.service
+sudo nano /etc/systemd/system/labguard.service
 ```
 
 Key settings to verify:
@@ -458,9 +459,9 @@ Key settings to verify:
 Enable and start:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable homelab-dashboard.service
-sudo systemctl start homelab-dashboard.service
-sudo systemctl status homelab-dashboard.service
+sudo systemctl enable labguard.service
+sudo systemctl start labguard.service
+sudo systemctl status labguard.service
 ```
 
 #### Agent Service
@@ -468,31 +469,52 @@ sudo systemctl status homelab-dashboard.service
 Copy the example service file on **each agent host**:
 
 ```bash
-sudo cp systemd/homelab-agent.service.example /etc/systemd/system/homelab-agent.service
+sudo cp systemd/labguard-agent.service.example /etc/systemd/system/labguard-agent.service
 ```
 
 Edit as needed:
 ```bash
-sudo nano /etc/systemd/system/homelab-agent.service
+sudo nano /etc/systemd/system/labguard-agent.service
 ```
 
 Key settings to verify:
 - `User=` (your username)
 - `WorkingDirectory=` (path to cloned repo)
-- `EnvironmentFile=` (path to homelab-agent.env)
+- `EnvironmentFile=` (path to labguard-agent.env)
 
 Enable and start:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable homelab-agent.service
-sudo systemctl start homelab-agent.service
-sudo systemctl status homelab-agent.service
+sudo systemctl enable labguard-agent.service
+sudo systemctl start labguard-agent.service
+sudo systemctl status labguard-agent.service
 ```
 
 Check agent logs:
 ```bash
-sudo journalctl -u homelab-agent.service -f
+sudo journalctl -u labguard-agent.service -f
 ```
+
+### Migrating from HomeLab Dashboard (renamed to LabGuard)
+
+The project was renamed to LabGuard. Existing installations keep working:
+
+- `LABGUARD_*` environment variables are preferred; the old `HOMELAB_*` names
+  are still accepted as fallback (`HOMELAB_AGENT_KEY`, `HOMELAB_AGENT_TLS_DIR`, ...).
+- Docker: the state volume, history and password are kept as long as the
+  Compose project name stays the same (e.g. `homelab-dashboard` in Dockhand).
+  The container-internal state path is now `/opt/labguard/state`. Agent
+  certificates are mounted at `/etc/labguard/certs` and, for existing configs,
+  still at `/etc/homelab-dashboard/certs`. The default config file name is
+  `labguard.config.py`; set `LABGUARD_CONFIG_PATH` (or the old
+  `HOMELAB_CONFIG_PATH`) if your file has another name or location.
+- Images are now called `labguard:local` and `labguard-agent:local`.
+- Users must log in once again because the session cookie was renamed.
+- Native installs: systemd units, sudoers file and env file examples were
+  renamed (`labguard.service`, `labguard-agent.service`, `labguard.sudoers`,
+  `labguard-agent.env`). Existing units under the old names keep working.
+- In Dockhand, save and redeploy each stack after updating (edit, then save
+  and deploy), so the new Compose files are used.
 
 ### Updating to v2.2.1
 
@@ -535,7 +557,7 @@ AGENT_URLS='["http://pi-1.local:9100/api/metrics","http://pi-2.local:9100/api/me
 
 Then restart the dashboard:
 ```bash
-sudo systemctl restart homelab-dashboard.service
+sudo systemctl restart labguard.service
 ```
 
 ### Notifications, temperature alerts and daily report
@@ -550,7 +572,7 @@ leaving a secret field empty retains the saved value.
   login, sender and one or more recipients (comma separated). Certificates are
   verified.
 - **Webhook**: the dashboard sends `POST` with JSON
-  `{"source": "homelab-dashboard", "message": "...", "text": "..."}` to your URL
+  `{"source": "labguard", "message": "...", "text": "..."}` to your URL
   (`text` is included for Slack/Mattermost-style receivers). An optional token is
   sent as `Authorization: Bearer <token>`.
 - **Gotify**: server URL and an application token.
@@ -561,7 +583,7 @@ are configured per host. Alerts repeat every five minutes while the threshold
 is exceeded; a recovery message follows when the temperature returns to normal.
 
 Optionally enable **hardware alerts** in the same form. They require
-S.M.A.R.T. (`HOMELAB_ENABLE_SMART=1`) and/or ZFS data from the agent and are off
+S.M.A.R.T. (`LABGUARD_ENABLE_SMART=1`) and/or ZFS data from the agent and are off
 by default. Hosts are checked every five minutes. A notification is sent when
 the list of problems changes (failed health check, reallocated/pending/
 uncorrectable sectors, NVMe warnings, ZFS pool not `ONLINE`), and again when all
@@ -614,7 +636,7 @@ samples are retained for approximately 25 hours. Run one dashboard worker only.
 **Agent port:**
 Update the agent startup command in the systemd service file:
 ```ini
-ExecStart=/opt/homelab-dashboard/venv/bin/uvicorn backend.agent:app --host 0.0.0.0 --port 9100
+ExecStart=/opt/labguard/venv/bin/uvicorn backend.agent:app --host 0.0.0.0 --port 9100
 ```
 
 Then update all agent URLs in the dashboard `.env`.
@@ -675,7 +697,7 @@ No code changes needed—just restart the dashboard.
 ⚠️ **Important Notes:**
 
 - ✅ **Never commit `.env` files** to version control
-- ✅ **Use strong agent keys** (HOMELAB_AGENT_KEY)
+- ✅ **Use strong agent keys** (LABGUARD_AGENT_KEY)
 - ✅ **Keep agents on trusted network** (not exposed to internet)
 - ✅ **Use TLS/reverse proxy** if exposing dashboard externally
 - ✅ **Restrict sudoers** to only UFW and Fail2Ban commands
@@ -701,15 +723,15 @@ the key and metrics travel in clear text, so enable HTTPS on agents outside
    ```
 
 2. Start the agent with TLS. Native: set `UVICORN_SSL_CERTFILE` and
-   `UVICORN_SSL_KEYFILE` in `/etc/homelab-agent.env`. Docker Compose: add
-   `-f compose.agent.tls.yaml` and set `HOMELAB_AGENT_TLS_DIR` to the directory
+   `UVICORN_SSL_KEYFILE` in `/etc/labguard-agent.env`. Docker Compose: add
+      `-f compose.agent.tls.yaml` and set `LABGUARD_AGENT_TLS_DIR` to the directory
    containing `agent.crt` and `agent.key`.
 3. Copy `agent.crt` (not the key) to the dashboard host and use an `https://`
    URL. With a config file, pin the certificate per agent:
 
    ```python
    AGENTS = {"HomeLab1": {"url": "https://homelab1.lan:9100",
-                          "ca_cert": "/opt/homelab-dashboard/certs/homelab1.crt"}}
+                          "ca_cert": "/opt/labguard/certs/homelab1.crt"}}
    ```
 
    With `AGENT_URLS`, set `AGENT_CA_CERT` to the certificate path. Certificates
@@ -719,7 +741,7 @@ the key and metrics travel in clear text, so enable HTTPS on agents outside
 
 Prefer a different key per agent so a leaked key only affects one host. In the
 config file, add `"key"` to the agent entry; agents without it use `AGENT_KEY`.
-To register a new agent, generate its key, set it as `HOMELAB_AGENT_KEY` on the
+To register a new agent, generate its key, set it as `LABGUARD_AGENT_KEY` on the
 agent and as `"key"` in the dashboard config entry.
 
 ```python
@@ -732,16 +754,16 @@ AGENTS = {"HomeLab1": {"url": "https://homelab1.lan:9100", "key": "unique-key-fo
 | --- | --- | --- |
 | Read-only `/proc` and `/` mounts | CPU, RAM, storage | On |
 | Docker socket (root-equivalent) | Container status and events | On; remove the mount if not needed (Docker data is then shown as unavailable) |
-| `HOMELAB_JOURNAL_DIR` | SSH and Fail2Ban events | Off |
+| `LABGUARD_JOURNAL_DIR` | SSH and Fail2Ban events | Off |
 | `compose.agent.security.yaml` (`NET_ADMIN`, host network, `/etc/ufw`) | UFW status | Off |
-| `HOMELAB_ENABLE_FAIL2BAN=1` | Fail2Ban status | Off |
+| `LABGUARD_ENABLE_FAIL2BAN=1` | Fail2Ban status | Off |
 
 All capabilities are dropped except those listed, the root filesystem is
 read-only and `no-new-privileges` is set. Enable only the sources you need.
 
 ### HTTPS for the dashboard behind a reverse proxy
 
-Run the dashboard on `127.0.0.1` (default `HOMELAB_BIND_ADDRESS`) and let the
+Run the dashboard on `127.0.0.1` (default `LABGUARD_BIND_ADDRESS`) and let the
 proxy terminate TLS. Start Uvicorn with `--proxy-headers
 --forwarded-allow-ips PROXY-IP` so session cookies are marked `Secure`.
 
@@ -793,7 +815,7 @@ sudo ufw deny 9100
 **Check:**
 1. Agents are running:
    ```bash
-   sudo systemctl status homelab-agent.service
+   sudo systemctl status labguard-agent.service
    ```
 
 2. Agent port is accessible:
@@ -849,10 +871,10 @@ If Docker is not installed, the agent simply skips container monitoring (no erro
 Remove `NoNewPrivileges=true` from the systemd service file:
 
 ```bash
-sudo nano /etc/systemd/system/homelab-agent.service
+sudo nano /etc/systemd/system/labguard-agent.service
 # Delete or comment out: NoNewPrivileges=true
 sudo systemctl daemon-reload
-sudo systemctl restart homelab-agent.service
+sudo systemctl restart labguard-agent.service
 ```
 
 ---
@@ -861,12 +883,12 @@ sudo systemctl restart homelab-agent.service
 
 **Check dashboard logs:**
 ```bash
-sudo journalctl -u homelab-dashboard.service -n 50 -f
+sudo journalctl -u labguard.service -n 50 -f
 ```
 
 **Check agent logs:**
 ```bash
-sudo journalctl -u homelab-agent.service -n 50 -f
+sudo journalctl -u labguard-agent.service -n 50 -f
 ```
 
 ---
@@ -921,7 +943,7 @@ HomeLab-Dashboard/
 ├── README.md                            # This file
 ├── .gitignore                           # Git ignore rules
 ├── .env.example                         # Dashboard config template
-├── homelab-agent.env.example            # Agent config template
+├── labguard-agent.env.example           # Agent config template
 │
 ├── dashboard_api.py                     # Dashboard web server
 ├── frontend/
@@ -931,8 +953,8 @@ HomeLab-Dashboard/
 │   └── test_dashboard.py                # Focused backend tests
 │
 └── systemd/
-    ├── homelab-dashboard.service.example  # Dashboard systemd service template
-    └── homelab-agent.service.example      # Agent systemd service template
+    ├── labguard.service.example         # Dashboard systemd service template
+    └── labguard-agent.service.example   # Agent systemd service template
 ```
 
 ---
@@ -943,8 +965,8 @@ If you encounter issues:
 
 1. **Check the [Troubleshooting](#troubleshooting) section**
 2. **Review the logs:**
-   - Dashboard: `sudo journalctl -u homelab-dashboard.service -f`
-   - Agent: `sudo journalctl -u homelab-agent.service -f`
+   - Dashboard: `sudo journalctl -u labguard.service -f`
+   - Agent: `sudo journalctl -u labguard-agent.service -f`
 3. **Open an issue** on GitHub with:
    - What you tried
    - What you expected

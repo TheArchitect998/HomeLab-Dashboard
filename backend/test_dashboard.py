@@ -853,6 +853,17 @@ class AgentEventTests(unittest.TestCase):
             cls.agent = load_module("agent_test", ROOT / "agent.py")
         cls.client = TestClient(cls.agent.app, headers={"X-Agent-Key": "test-agent-key-0123456789"})
 
+    def test_env_prefers_labguard_and_falls_back_to_legacy_name(self):
+        with patch.dict(os.environ, {"HOMELAB_ENABLE_SMART": "0", "LABGUARD_ENABLE_SMART": "1"}):
+            self.assertEqual(self.agent.env("ENABLE_SMART"), "1")
+        with patch.dict(os.environ, {"HOMELAB_JOURNAL_DIR": "/legacy"}):
+            os.environ.pop("LABGUARD_JOURNAL_DIR", None)
+            self.assertEqual(self.agent.env("JOURNAL_DIR"), "/legacy")
+        with patch.dict(os.environ, {}):
+            os.environ.pop("LABGUARD_X", None)
+            os.environ.pop("HOMELAB_X", None)
+            self.assertEqual(self.agent.env("X", "d"), "d")
+
     def test_event_filtering_and_half_open_interval(self):
         journal = [
             {"__REALTIME_TIMESTAMP": "101000000", "SYSLOG_IDENTIFIER": "sshd", "MESSAGE": "pam_unix(sshd:session): session opened for user alice"},

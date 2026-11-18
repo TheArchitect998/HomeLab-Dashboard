@@ -3,7 +3,7 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-WORKDIR /opt/homelab-dashboard
+WORKDIR /opt/labguard
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends iputils-ping \
