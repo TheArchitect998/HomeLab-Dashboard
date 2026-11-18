@@ -98,8 +98,8 @@ The screenshot uses synthetic example data.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/TheArchitect998/HomeLab-Dashboard.git
-cd HomeLab-Dashboard
+git clone https://github.com/TheArchitect998/LabGuard.git
+cd LabGuard
 ```
 
 ### 2. Create virtual environment
@@ -324,7 +324,7 @@ sudo mkdir -p /opt/labguard
 cd /opt/labguard
 
 # Clone repository
-git clone https://github.com/TheArchitect998/HomeLab-Dashboard.git .
+git clone https://github.com/TheArchitect998/LabGuard.git .
 
 # Create virtual environment
 python3 -m venv venv
@@ -380,7 +380,7 @@ sudo mkdir -p /opt/labguard
 cd /opt/labguard
 
 # Clone repository
-git clone https://github.com/TheArchitect998/HomeLab-Dashboard.git .
+git clone https://github.com/TheArchitect998/LabGuard.git .
 
 # Create virtual environment
 python3 -m venv venv
@@ -938,7 +938,7 @@ You may use, modify, and distribute this software in accordance with the terms o
 ## Project Structure
 
 ```
-HomeLab-Dashboard/
+LabGuard/
 ├── LICENSE                              # Apache License 2.0
 ├── README.md                            # This file
 ├── .gitignore                           # Git ignore rules
