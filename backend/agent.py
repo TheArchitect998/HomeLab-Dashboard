@@ -18,15 +18,18 @@ SUDO_COMMANDS = {"ufw", "fail2ban-client", "smartctl"}
 
 
 def env(name: str, default: str = "") -> str:
-    """Read LABGUARD_<name>, falling back to the legacy HOMELAB_<name> variable."""
-    return os.environ.get(f"LABGUARD_{name}", os.environ.get(f"HOMELAB_{name}", default))
+    """Read NODESENTINEL_<name>, falling back to the legacy HOMELAB_<name> variable."""
+    return os.environ.get(
+        f"NODESENTINEL_{name}",
+        os.environ.get(f"HOMELAB_{name}", default),
+    )
 
 
-app = FastAPI(title="LabGuard agent", docs_url=None, redoc_url=None)
+app = FastAPI(title="NodeSentinel agent", docs_url=None, redoc_url=None)
 KEY = env("AGENT_KEY")
 CONTAINER_MODE = env("AGENT_CONTAINER") == "1"
 if len(KEY.strip()) < 16 or KEY.strip() != KEY or KEY == "change-me":
-    raise RuntimeError("LABGUARD_AGENT_KEY is required: at least 16 characters, no surrounding whitespace, not the example value")
+    raise RuntimeError("NODESENTINEL_AGENT_KEY is required: at least 16 characters, no surrounding whitespace, not the example value")
 if CONTAINER_MODE:
     psutil.PROCFS_PATH = "/host/proc"
 

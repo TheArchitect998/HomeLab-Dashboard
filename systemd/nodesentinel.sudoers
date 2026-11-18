@@ -1,7 +1,7 @@
-Cmnd_Alias LABGUARD_READONLY = /usr/bin/ufw status, /usr/bin/fail2ban-client status, /usr/bin/fail2ban-client status *
-user ALL=(root) NOPASSWD: LABGUARD_READONLY
+Cmnd_Alias NODESENTINEL_READONLY = /usr/bin/ufw status, /usr/bin/fail2ban-client status, /usr/bin/fail2ban-client status *
+user ALL=(root) NOPASSWD: NODESENTINEL_READONLY
 
-# Optional S.M.A.R.T. access (set LABGUARD_ENABLE_SMART=1 in /etc/labguard-agent.env).
+# Optional S.M.A.R.T. access (set NODESENTINEL_ENABLE_SMART=1 in /etc/nodesentinel-agent.env).
 # Uncomment both lines. The wildcards also match extra smartctl options, so grant this only on trusted hosts.
-# Cmnd_Alias LABGUARD_SMART = /usr/sbin/smartctl --scan -j, /usr/sbin/smartctl -j -H -A -n standby /dev/*, /usr/sbin/smartctl -j -H -A -n standby -d * /dev/*
-# user ALL=(root) NOPASSWD: LABGUARD_SMART
+# Cmnd_Alias NODESENTINEL_SMART = /usr/sbin/smartctl --scan -j, /usr/sbin/smartctl -j -H -A -n standby /dev/*, /usr/sbin/smartctl -j -H -A -n standby -d * /dev/*
+# user ALL=(root) NOPASSWD: NODESENTINEL_SMART

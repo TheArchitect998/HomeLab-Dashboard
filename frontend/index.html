@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#071321" />
-    <title>LabGuard</title>
+    <title>NodeSentinel</title>
     <style>
       :root {
         color-scheme: dark;
@@ -639,7 +639,7 @@
   <body>
     <section id="login-screen" class="login-screen" hidden>
       <div class="panel form-panel">
-        <h1>LabGuard</h1>
+        <h1>NodeSentinel</h1>
         <form id="login-form">
           <label><span data-i18n="password">Passwort</span><input name="password" type="password" autocomplete="current-password" required /></label>
           <button type="submit" data-i18n="login">Anmelden</button>
@@ -648,13 +648,13 @@
       </div>
     </section>
     <header class="topbar" id="dashboard-header" hidden>
-      <a class="brand" href="#overview" aria-label="LabGuard Übersicht" data-i18n-aria-label="brandAria">
+      <a class="brand" href="#overview" aria-label="NodeSentinel Übersicht" data-i18n-aria-label="brandAria">
         <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="m12 2 9 4.5-9 4.5-9-4.5L12 2Z" />
           <path d="m3 11 9 4.5 9-4.5M3 16l9 5 9-5M3 6.5V16m18-9.5V16M7 8.5v4m10-4v4" />
         </svg>
         <span>
-          <span class="brand-title">LabGuard</span>
+          <span class="brand-title">NodeSentinel</span>
           <span class="brand-subtitle" data-i18n="brandSubtitle">Infrastructure Overview</span>
         </span>
       </a>
@@ -944,15 +944,15 @@
       let latestUpdatedAt = null;
       let historyData = null;
       let historyRequest = 0;
-      const dashboardLayoutKey = 'homelab-dashboard-layout:v1';
+      const dashboardLayoutKey = 'nodesentinel-dashboard-layout:v1';
       let dashboardLayout = {};
       let layoutEditing = false;
       let layoutPointer = null;
 
       const translations = {
         de: {
-          pageTitle: 'LabGuard',
-          brandAria: 'LabGuard Übersicht',
+          pageTitle: 'NodeSentinel',
+          brandAria: 'NodeSentinel Übersicht',
           brandSubtitle: 'Infrastrukturübersicht',
           languageLabel: 'Sprache',
           loadingStatus: 'Lade Status',
@@ -1027,8 +1027,8 @@
           invalidData: 'Die Dashboard-API hat ein ungültiges Datenformat geliefert'
         },
         en: {
-          pageTitle: 'LabGuard',
-          brandAria: 'LabGuard overview',
+          pageTitle: 'NodeSentinel',
+          brandAria: 'NodeSentinel overview',
           brandSubtitle: 'Infrastructure Overview',
           languageLabel: 'Language',
           loadingStatus: 'Loading status',
@@ -1103,8 +1103,8 @@
           invalidData: 'The dashboard API returned an invalid data format'
         },
         fr: {
-          pageTitle: 'LabGuard',
-          brandAria: 'Vue d’ensemble de LabGuard',
+          pageTitle: 'NodeSentinel',
+          brandAria: 'Vue d’ensemble de NodeSentinel',
           brandSubtitle: 'Vue d’ensemble de l’infrastructure',
           languageLabel: 'Langue',
           loadingStatus: 'Chargement du statut',
@@ -1322,7 +1322,8 @@
       });
 
       const languageLocales = { de: 'de-DE', en: 'en-GB', fr: 'fr-FR' };
-      const savedLanguage = localStorage.getItem('homelab-dashboard-language');
+      const savedLanguage = localStorage.getItem('nodesentinel-dashboard-language')
+        || localStorage.getItem('homelab-dashboard-language');
       let currentLanguage = Object.hasOwn(translations, savedLanguage) ? savedLanguage : 'de';
 
       function t(key, values = {}) {
@@ -1658,7 +1659,8 @@
       }
 
       function loadDashboardLayout() {
-        const saved = localStorage.getItem(dashboardLayoutKey);
+        const saved = localStorage.getItem(dashboardLayoutKey)
+          || localStorage.getItem('homelab-dashboard-layout:v1');
         if (!saved) return {};
         try {
           const parsed = JSON.parse(saved);
@@ -1951,7 +1953,7 @@
         applyDashboardLayout();
         document.querySelectorAll('#security details').forEach((detail) => {
           const key = JSON.stringify([detail.closest('[data-host]').dataset.host, detail.dataset.detail]);
-          const saved = sessionStorage.getItem(`homelab-security:${location.hash || '#overview'}:${key}`);
+          const saved = sessionStorage.getItem(`nodesentinel-security:${location.hash || '#overview'}:${key}`);
           detail.open = detailStates.has(key) ? detailStates.get(key) : saved === null ? location.hash === '#security' : saved === 'true';
         });
         applyView();
@@ -2043,7 +2045,7 @@
 
       async function api(path, method = 'GET', body) {
         const response = await fetch(path, {
-          method, headers: method === 'GET' ? {} : { 'Content-Type': 'application/json', 'X-Requested-With': 'LabGuard' },
+          method, headers: method === 'GET' ? {} : { 'Content-Type': 'application/json', 'X-Requested-With': 'NodeSentinel' },
           body: body === undefined ? undefined : JSON.stringify(body)
         });
         const data = await response.json();
@@ -2453,11 +2455,12 @@
       ['font-size', 'theme'].forEach((setting) => {
         const input = document.getElementById(setting);
         const values = setting === 'font-size' ? ['small', 'medium', 'large'] : ['dark', 'light'];
-        const stored = localStorage.getItem(`homelab-${setting}`);
+        const stored = localStorage.getItem(`nodesentinel-${setting}`)
+          || localStorage.getItem(`homelab-${setting}`);
         input.value = values.includes(stored) ? stored : (setting === 'font-size' ? 'medium' : 'dark');
         const apply = () => {
           document.documentElement.dataset[setting === 'font-size' ? 'size' : 'theme'] = input.value;
-          localStorage.setItem(`homelab-${setting}`, input.value);
+          localStorage.setItem(`nodesentinel-${setting}`, input.value);
         };
         input.addEventListener('change', apply);
         apply();
@@ -2477,7 +2480,7 @@
       document.querySelector('#history-range').addEventListener('change', loadHistory);
       function saveSecurityDetail(detail) {
         const key = JSON.stringify([detail.closest('[data-host]').dataset.host, detail.dataset.detail]);
-        sessionStorage.setItem(`homelab-security:${location.hash || '#overview'}:${key}`, String(detail.open));
+        sessionStorage.setItem(`nodesentinel-security:${location.hash || '#overview'}:${key}`, String(detail.open));
       }
       document.querySelector('#app').addEventListener('toggle', (event) => {
         if (event.target.matches('#security details') && event.target.isConnected) saveSecurityDetail(event.target);
@@ -2504,7 +2507,7 @@
 
       document.querySelector('#language-select').addEventListener('change', (event) => {
         currentLanguage = event.target.value;
-        localStorage.setItem('homelab-dashboard-language', currentLanguage);
+        localStorage.setItem('nodesentinel-dashboard-language', currentLanguage);
         applyTranslations();
         document.querySelectorAll('[data-provider-form][data-credentials-present]').forEach((form) => {
           setCredentialStatus(form, form.dataset.credentialsPresent === 'true');

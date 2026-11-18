@@ -1,15 +1,17 @@
+name: nodesentinel
+
 services:
   agent:
     build:
       context: .
       dockerfile: Dockerfile.agent
-    image: labguard-agent:local
+    image: nodesentinel-agent:local
     restart: unless-stopped
     environment:
-      LABGUARD_AGENT_KEY: "${LABGUARD_AGENT_KEY:-${HOMELAB_AGENT_KEY:?Set LABGUARD_AGENT_KEY before starting the agent}}"
-      LABGUARD_JOURNAL_DIR: "${LABGUARD_JOURNAL_DIR:-${HOMELAB_JOURNAL_DIR:-}}"
+      NODESENTINEL_AGENT_KEY: "${NODESENTINEL_AGENT_KEY:-${HOMELAB_AGENT_KEY:?Set NODESENTINEL_AGENT_KEY before starting the agent}}"
+      NODESENTINEL_JOURNAL_DIR: "${NODESENTINEL_JOURNAL_DIR:-${HOMELAB_JOURNAL_DIR:-}}"
     ports:
-      - "${LABGUARD_AGENT_BIND_ADDRESS:-${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}}:${LABGUARD_AGENT_PORT:-${HOMELAB_AGENT_PORT:-9100}}:9100"
+      - "${NODESENTINEL_AGENT_BIND_ADDRESS:-${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}}:${NODESENTINEL_AGENT_PORT:-${HOMELAB_AGENT_PORT:-9100}}:9100"
     cap_drop:
       - ALL
     security_opt:

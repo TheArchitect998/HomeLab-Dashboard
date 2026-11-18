@@ -1,19 +1,21 @@
+name: nodesentinel
+
 # Full-featured agent: HTTPS, journal (SSH/Fail2Ban events), UFW, Fail2Ban,
 # S.M.A.R.T., Docker and host networking in one file. Use it INSTEAD of the other
 # agent Compose files:
 #   docker compose -f compose.agent.full.yaml up -d --build
 #
 # Required variables (e.g. in .env):
-#   LABGUARD_AGENT_KEY        at least 16 random characters
-#   LABGUARD_AGENT_TLS_DIR    directory with agent.crt and agent.key
-#   LABGUARD_JOURNAL_DIR      journal directory as seen in the container, e.g.
+#   NODESENTINEL_AGENT_KEY        at least 16 random characters
+#   NODESENTINEL_AGENT_TLS_DIR    directory with agent.crt and agent.key
+#   NODESENTINEL_JOURNAL_DIR      journal directory as seen in the container, e.g.
 #                             /host/root/var/log/journal/<machine-id>
 # Optional variables:
-#   LABGUARD_AGENT_BIND_ADDRESS (default 127.0.0.1), LABGUARD_AGENT_PORT (9100)
-#   LABGUARD_ENABLE_UFW (1), LABGUARD_ENABLE_FAIL2BAN (1), LABGUARD_ENABLE_SMART (1)
-#   LABGUARD_SMART_DEVICE     disk to read S.M.A.R.T. from (default /dev/sda);
+#   NODESENTINEL_AGENT_BIND_ADDRESS (default 127.0.0.1), NODESENTINEL_AGENT_PORT (9100)
+#   NODESENTINEL_ENABLE_UFW (1), NODESENTINEL_ENABLE_FAIL2BAN (1), NODESENTINEL_ENABLE_SMART (1)
+#   NODESENTINEL_SMART_DEVICE     disk to read S.M.A.R.T. from (default /dev/sda);
 #                             the device must exist on the host
-# The legacy HOMELAB_* names are still accepted as fallback.
+# Previous HOMELAB_* names are still accepted as fallbacks.
 # Security notes: NET_ADMIN allows firewall changes, SYS_RAWIO allows raw disk
 # commands, the Docker socket is effectively host root, and the journal and the
 # Fail2Ban socket expose sensitive data. Disable what you do not need.
@@ -22,23 +24,23 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.agent
-    image: labguard-agent:local
+    image: nodesentinel-agent:local
     restart: unless-stopped
     network_mode: host
     command:
       - uvicorn
       - agent:app
       - --host
-      - "${LABGUARD_AGENT_BIND_ADDRESS:-${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}}"
+      - "${NODESENTINEL_AGENT_BIND_ADDRESS:-${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}}"
       - --port
-      - "${LABGUARD_AGENT_PORT:-${HOMELAB_AGENT_PORT:-9100}}"
+      - "${NODESENTINEL_AGENT_PORT:-${HOMELAB_AGENT_PORT:-9100}}"
     environment:
-      LABGUARD_AGENT_KEY: "${LABGUARD_AGENT_KEY:-${HOMELAB_AGENT_KEY:?Set LABGUARD_AGENT_KEY before starting the agent}}"
-      LABGUARD_JOURNAL_DIR: "${LABGUARD_JOURNAL_DIR:-${HOMELAB_JOURNAL_DIR:?Set LABGUARD_JOURNAL_DIR, e.g. /host/root/var/log/journal/<machine-id>}}"
-      LABGUARD_ENABLE_UFW: "${LABGUARD_ENABLE_UFW:-${HOMELAB_ENABLE_UFW:-1}}"
-      LABGUARD_ENABLE_FAIL2BAN: "${LABGUARD_ENABLE_FAIL2BAN:-${HOMELAB_ENABLE_FAIL2BAN:-1}}"
-      LABGUARD_FAIL2BAN_SOCKET: /host/root/run/fail2ban/fail2ban.sock
-      LABGUARD_ENABLE_SMART: "${LABGUARD_ENABLE_SMART:-${HOMELAB_ENABLE_SMART:-1}}"
+      NODESENTINEL_AGENT_KEY: "${NODESENTINEL_AGENT_KEY:-${HOMELAB_AGENT_KEY:?Set NODESENTINEL_AGENT_KEY before starting the agent}}"
+      NODESENTINEL_JOURNAL_DIR: "${NODESENTINEL_JOURNAL_DIR:-${HOMELAB_JOURNAL_DIR:?Set NODESENTINEL_JOURNAL_DIR, e.g. /host/root/var/log/journal/<machine-id>}}"
+      NODESENTINEL_ENABLE_UFW: "${NODESENTINEL_ENABLE_UFW:-${HOMELAB_ENABLE_UFW:-1}}"
+      NODESENTINEL_ENABLE_FAIL2BAN: "${NODESENTINEL_ENABLE_FAIL2BAN:-${HOMELAB_ENABLE_FAIL2BAN:-1}}"
+      NODESENTINEL_FAIL2BAN_SOCKET: /host/root/run/fail2ban/fail2ban.sock
+      NODESENTINEL_ENABLE_SMART: "${NODESENTINEL_ENABLE_SMART:-${HOMELAB_ENABLE_SMART:-1}}"
       UVICORN_SSL_CERTFILE: /tls/agent.crt
       UVICORN_SSL_KEYFILE: /tls/agent.key
     cap_drop:
@@ -53,7 +55,7 @@ services:
       - /tmp
       - /run
     devices:
-      - "${LABGUARD_SMART_DEVICE:-${HOMELAB_SMART_DEVICE:-/dev/sda}}:${LABGUARD_SMART_DEVICE:-${HOMELAB_SMART_DEVICE:-/dev/sda}}"
+      - "${NODESENTINEL_SMART_DEVICE:-${HOMELAB_SMART_DEVICE:-/dev/sda}}:${NODESENTINEL_SMART_DEVICE:-${HOMELAB_SMART_DEVICE:-/dev/sda}}"
     volumes:
       - type: bind
         source: /proc
@@ -80,7 +82,7 @@ services:
         bind:
           create_host_path: false
       - type: bind
-        source: "${LABGUARD_AGENT_TLS_DIR:-${HOMELAB_AGENT_TLS_DIR:?Set LABGUARD_AGENT_TLS_DIR to the directory with agent.crt and agent.key}}"
+        source: "${NODESENTINEL_AGENT_TLS_DIR:-${HOMELAB_AGENT_TLS_DIR:?Set NODESENTINEL_AGENT_TLS_DIR to the directory with agent.crt and agent.key}}"
         target: /tls
         read_only: true
         bind:

@@ -48,7 +48,7 @@ class DashboardTests(unittest.TestCase):
         self.dashboard.provider_locks.clear()
         self.dashboard.write_settings({"password": self.dashboard.password_hash("correct-password")})
         self.client = TestClient(self.dashboard.app)
-        self.headers = {"X-Requested-With": "LabGuard"}
+        self.headers = {"X-Requested-With": "NodeSentinel"}
 
     def login(self, password="correct-password"):
         return self.client.post("/api/auth/login", json={"password": password}, headers=self.headers)
@@ -92,7 +92,7 @@ class DashboardTests(unittest.TestCase):
         agent_path = ROOT / "agent.py"
         for key in ("", "change-me", "short", " " + "k" * 20):
             with patch.dict(os.environ, {"HOMELAB_AGENT_KEY": key}):
-                with self.assertRaisesRegex(RuntimeError, "LABGUARD_AGENT_KEY"):
+                with self.assertRaisesRegex(RuntimeError, "NODESENTINEL_AGENT_KEY"):
                     load_module("agent_test", agent_path)
         with patch.dict(os.environ, {"HOMELAB_AGENT_KEY": "k" * 20}):
             agent = load_module("agent_test", agent_path)
@@ -337,7 +337,7 @@ class DashboardTests(unittest.TestCase):
                         "topic": "private_topic", "token": "tk_test"}
             self.assertEqual(self.client.put("/api/notifications/ntfy", json=settings, headers=self.headers).status_code, 200)
             self.assertEqual(self.client.post("/api/notifications/ntfy/test", headers=self.headers).status_code, 200)
-            self.assertEqual(requests, [("/private_topic", "Bearer tk_test", "LabGuard: test notification")])
+            self.assertEqual(requests, [("/private_topic", "Bearer tk_test", "NodeSentinel: test notification")])
         finally:
             server.shutdown()
             server.server_close()
@@ -524,7 +524,7 @@ class DashboardTests(unittest.TestCase):
         server.starttls.assert_called_once()
         server.login.assert_called_once_with("u", "secret")
         mail = server.send_message.call_args.args[0]
-        self.assertEqual((mail["To"], mail["Subject"]), ("x@y.test, z@y.test", "LabGuard: ⚠️ Alarm"))
+        self.assertEqual((mail["To"], mail["Subject"]), ("x@y.test, z@y.test", "NodeSentinel: ⚠️ Alarm"))
 
     def test_checks_api_validation(self):
         self.login()
@@ -765,7 +765,7 @@ class DashboardTests(unittest.TestCase):
                           "storage_percent": 40, "temperature_c": None}
         with patch.object(self.dashboard.cfg, "AGENTS", agents), \
              patch.object(self.dashboard, "fetch", new=AsyncMock(side_effect=fetch)):
-            with self.assertLogs("labguard", level="WARNING") as logs:
+            with self.assertLogs("nodesentinel", level="WARNING") as logs:
                 asyncio.run(self.dashboard.collect_history(now))
             self.assertIn("offline", logs.output[0])
             asyncio.run(self.dashboard.collect_history(now))
@@ -838,7 +838,7 @@ class DashboardTests(unittest.TestCase):
             db.close()
         with patch.object(self.dashboard.cfg, "AGENTS", agents), \
              patch.object(self.dashboard, "fetch", new=AsyncMock(return_value=("host", {"online": False, "error": "offline"}))):
-            with self.assertLogs("labguard", level="WARNING"):
+            with self.assertLogs("nodesentinel", level="WARNING"):
                 with TestClient(self.dashboard.app) as client:
                     self.assertEqual(client.post("/api/auth/login", json={"password": "correct-password"},
                                                  headers=self.headers).status_code, 200)
@@ -853,14 +853,14 @@ class AgentEventTests(unittest.TestCase):
             cls.agent = load_module("agent_test", ROOT / "agent.py")
         cls.client = TestClient(cls.agent.app, headers={"X-Agent-Key": "test-agent-key-0123456789"})
 
-    def test_env_prefers_labguard_and_falls_back_to_legacy_name(self):
-        with patch.dict(os.environ, {"HOMELAB_ENABLE_SMART": "0", "LABGUARD_ENABLE_SMART": "1"}):
+    def test_env_prefers_nodesentinel_and_falls_back_to_legacy_name(self):
+        with patch.dict(os.environ, {"HOMELAB_ENABLE_SMART": "0", "NODESENTINEL_ENABLE_SMART": "1"}):
             self.assertEqual(self.agent.env("ENABLE_SMART"), "1")
         with patch.dict(os.environ, {"HOMELAB_JOURNAL_DIR": "/legacy"}):
-            os.environ.pop("LABGUARD_JOURNAL_DIR", None)
+            os.environ.pop("NODESENTINEL_JOURNAL_DIR", None)
             self.assertEqual(self.agent.env("JOURNAL_DIR"), "/legacy")
         with patch.dict(os.environ, {}):
-            os.environ.pop("LABGUARD_X", None)
+            os.environ.pop("NODESENTINEL_X", None)
             os.environ.pop("HOMELAB_X", None)
             self.assertEqual(self.agent.env("X", "d"), "d")
 

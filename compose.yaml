@@ -1,21 +1,23 @@
+name: nodesentinel
+
 services:
   dashboard:
     build: .
-    image: labguard:local
+    image: nodesentinel:local
     restart: unless-stopped
     environment:
-      TZ: "${LABGUARD_TIMEZONE:-${HOMELAB_TIMEZONE:-Etc/UTC}}"
-      LABGUARD_DASHBOARD_CONFIG: /etc/labguard.py
+      TZ: "${NODESENTINEL_TIMEZONE:-${HOMELAB_TIMEZONE:-Etc/UTC}}"
+      NODESENTINEL_DASHBOARD_CONFIG: /etc/nodesentinel.py
     ports:
-      - "${LABGUARD_BIND_ADDRESS:-${HOMELAB_BIND_ADDRESS:-127.0.0.1}}:${LABGUARD_PORT:-${HOMELAB_PORT:-8888}}:8888"
+      - "${NODESENTINEL_BIND_ADDRESS:-${HOMELAB_BIND_ADDRESS:-127.0.0.1}}:${NODESENTINEL_PORT:-${HOMELAB_PORT:-8888}}:8888"
     volumes:
       - type: bind
-        source: "${LABGUARD_CONFIG_PATH:-${HOMELAB_CONFIG_PATH:-./labguard.config.py}}"
-        target: /etc/labguard.py
+        source: "${NODESENTINEL_CONFIG_PATH:-${HOMELAB_CONFIG_PATH:-./nodesentinel.config.py}}"
+        target: /etc/nodesentinel.py
         read_only: true
         bind:
           create_host_path: false
-      - dashboard-state:/opt/labguard/state
+      - dashboard-state:/opt/nodesentinel/state
 
 volumes:
   dashboard-state:

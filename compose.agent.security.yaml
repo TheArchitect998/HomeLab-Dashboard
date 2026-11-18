@@ -13,13 +13,13 @@ services:
       - uvicorn
       - agent:app
       - --host
-      - "${LABGUARD_AGENT_BIND_ADDRESS:-${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}}"
+      - "${NODESENTINEL_AGENT_BIND_ADDRESS:-${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}}"
       - --port
-      - "${LABGUARD_AGENT_PORT:-${HOMELAB_AGENT_PORT:-9100}}"
+      - "${NODESENTINEL_AGENT_PORT:-${HOMELAB_AGENT_PORT:-9100}}"
     environment:
-      LABGUARD_ENABLE_UFW: "1"
-      LABGUARD_ENABLE_FAIL2BAN: "${LABGUARD_ENABLE_FAIL2BAN:-${HOMELAB_ENABLE_FAIL2BAN:-0}}"
-      LABGUARD_FAIL2BAN_SOCKET: /host/root/run/fail2ban/fail2ban.sock
+      NODESENTINEL_ENABLE_UFW: "1"
+      NODESENTINEL_ENABLE_FAIL2BAN: "${NODESENTINEL_ENABLE_FAIL2BAN:-${HOMELAB_ENABLE_FAIL2BAN:-0}}"
+      NODESENTINEL_FAIL2BAN_SOCKET: /host/root/run/fail2ban/fail2ban.sock
     volumes:
       - type: bind
         source: /etc/ufw

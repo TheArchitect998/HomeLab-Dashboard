@@ -31,8 +31,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 def env(name, default=None):
-    """Read LABGUARD_<name>, falling back to the legacy HOMELAB_<name> variable."""
-    return os.environ.get(f"LABGUARD_{name}", os.environ.get(f"HOMELAB_{name}", default))
+    """Read NODESENTINEL_<name>, falling back to the legacy HOMELAB_<name> variable."""
+    return os.environ.get(
+        f"NODESENTINEL_{name}",
+        os.environ.get(f"HOMELAB_{name}", default),
+    )
 
 
 config_file = env("DASHBOARD_CONFIG")
@@ -56,9 +59,9 @@ else:
         if os.environ.get("AGENT_CA_CERT"):
             agents[f"agent-{index + 1}"]["ca_cert"] = os.environ["AGENT_CA_CERT"]
     cfg = SimpleNamespace(AGENTS=agents, AGENT_KEY=os.environ.get("AGENT_KEY", ""),
-                          STATE_DIR=env("STATE_DIR", "/opt/labguard/state"))
+                          STATE_DIR=env("STATE_DIR", "/opt/nodesentinel/state"))
 
-STATE_DIR = pathlib.Path(getattr(cfg, "STATE_DIR", "/opt/labguard/state"))
+STATE_DIR = pathlib.Path(getattr(cfg, "STATE_DIR", "/opt/nodesentinel/state"))
 STATE_FILE = STATE_DIR / "settings.json"
 ITERATIONS = 600_000
 SESSION_SECONDS = 12 * 60 * 60
@@ -75,7 +78,7 @@ CHECK_FAILURES = 2
 MAX_CHECKS = 50
 check_status = {}
 check_failures = {}
-logger = logging.getLogger("labguard")
+logger = logging.getLogger("nodesentinel")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 sessions = {}
@@ -100,7 +103,7 @@ async def lifespan(app):
                 pass
 
 
-app = FastAPI(title="LabGuard", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+app = FastAPI(title="NodeSentinel", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 FRONTEND_DIR = pathlib.Path(__file__).parent / "frontend"
 if pathlib.Path(__file__).parent.name == "backend" and not FRONTEND_DIR.is_dir():
     FRONTEND_DIR = pathlib.Path(__file__).parent.parent / "frontend"
@@ -144,7 +147,7 @@ def validate_password(password):
 
 
 def require_session(request):
-    token = request.cookies.get("labguard_session", "")
+    token = request.cookies.get("nodesentinel_session", "")
     expiry = sessions.get(token, 0)
     if expiry <= time.time():
         sessions.pop(token, None)
@@ -156,7 +159,7 @@ async def protect_api(request, call_next):
     if request.url.path.startswith("/api/"):
         if request.method not in ("GET", "HEAD"):
             origin = request.headers.get("origin")
-            if request.headers.get("x-requested-with") != "LabGuard" or (
+            if request.headers.get("x-requested-with") != "NodeSentinel" or (
                 origin and urlsplit(origin).netloc != request.headers.get("host")
             ):
                 return JSONResponse({"detail": "Invalid request origin"}, status_code=403)
@@ -217,7 +220,7 @@ class MonitoringInput(BaseModel):
 @app.get("/api/auth/status")
 def auth_status(request: Request):
     configured = "password" in read_settings()
-    return {"configured": configured, "authenticated": sessions.get(request.cookies.get("labguard_session", ""), 0) > time.time()}
+    return {"configured": configured, "authenticated": sessions.get(request.cookies.get("nodesentinel_session", ""), 0) > time.time()}
 
 
 @app.post("/api/auth/login")
@@ -241,16 +244,16 @@ def login(data: PasswordInput, request: Request):
         token = secrets.token_urlsafe(32)
         sessions[token] = now + SESSION_SECONDS
     response = JSONResponse({"ok": True})
-    response.set_cookie("labguard_session", token, max_age=SESSION_SECONDS, httponly=True,
+    response.set_cookie("nodesentinel_session", token, max_age=SESSION_SECONDS, httponly=True,
                         secure=request.url.scheme == "https", samesite="strict", path="/")
     return response
 
 
 @app.post("/api/auth/logout")
 def logout(request: Request):
-    sessions.pop(request.cookies.get("labguard_session", ""), None)
+    sessions.pop(request.cookies.get("nodesentinel_session", ""), None)
     response = JSONResponse({"ok": True})
-    response.delete_cookie("labguard_session", path="/")
+    response.delete_cookie("nodesentinel_session", path="/")
     return response
 
 
@@ -911,7 +914,7 @@ async def deliver_notification(client, provider, settings, message):
             response.raise_for_status()
         return
     elif provider == "ntfy":
-        headers = {"Content-Type": "text/plain; charset=utf-8", "Title": "LabGuard"}
+        headers = {"Content-Type": "text/plain; charset=utf-8", "Title": "NodeSentinel"}
         if settings.get("token"):
             headers["Authorization"] = f"Bearer {settings['token']}"
         response = await client.post(f"{settings['server_url']}/{settings['topic']}",
@@ -934,10 +937,10 @@ async def deliver_notification(client, provider, settings, message):
     elif provider == "webhook":
         headers = {"Authorization": f"Bearer {settings['token']}"} if settings.get("token") else {}
         response = await client.post(settings["webhook_url"], headers=headers,
-                                     json={"source": "labguard", "message": message, "text": message})
+                                     json={"source": "nodesentinel", "message": message, "text": message})
     elif provider == "gotify":
         response = await client.post(f"{settings['server_url']}/message", headers={"X-Gotify-Key": settings["token"]},
-                                     json={"title": "LabGuard", "message": message, "priority": 5})
+                                     json={"title": "NodeSentinel", "message": message, "priority": 5})
     else:
         raise ValueError("Unknown notification provider")
     response.raise_for_status()
@@ -945,7 +948,7 @@ async def deliver_notification(client, provider, settings, message):
 
 def send_email(settings, message):
     mail = EmailMessage()
-    mail["Subject"] = "LabGuard: " + message.splitlines()[0][:80] if message.strip() else "LabGuard"
+    mail["Subject"] = "NodeSentinel: " + message.splitlines()[0][:80] if message.strip() else "NodeSentinel"
     mail["From"] = settings["sender"]
     mail["To"] = settings["recipient"]
     mail.set_content(message)
@@ -971,7 +974,7 @@ async def test_provider(provider: str):
     provider_failures.pop(provider, None)
     try:
         async with httpx.AsyncClient(timeout=20) as client:
-            await send_notification(client, provider, settings, "LabGuard: test notification")
+            await send_notification(client, provider, settings, "NodeSentinel: test notification")
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as error:
         logger.error("Test notification failed for %s: %s", provider, notification_error(error))
         raise HTTPException(502, "Test notification failed; check the dashboard logs") from error

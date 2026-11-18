@@ -1,13 +1,13 @@
 [Unit]
-Description=LabGuard dashboard service
+Description=NodeSentinel dashboard service
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 User=user
-WorkingDirectory=/opt/labguard
-EnvironmentFile=/opt/labguard/.env
-ExecStart=/opt/labguard/venv/bin/uvicorn dashboard_api:app --host 0.0.0.0 --port 8888
+WorkingDirectory=/opt/nodesentinel
+EnvironmentFile=/opt/nodesentinel/.env
+ExecStart=/opt/nodesentinel/venv/bin/uvicorn dashboard_api:app --host 0.0.0.0 --port 8888
 Restart=on-failure
 RestartSec=5
 
