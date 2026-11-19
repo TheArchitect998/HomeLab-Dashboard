@@ -1,16 +1,22 @@
-FROM python:3.12-slim
+FROM golang:1.24-bookworm AS build
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    NODESENTINEL_AGENT_CONTAINER=1
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd/ ./cmd/
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/nodesentinel ./cmd/nodesentinel
+
+FROM debian:bookworm-slim
+
+ENV NODESENTINEL_AGENT_CONTAINER=1 \
+    HOST_PROC=/host/proc
 
 WORKDIR /opt/nodesentinel-agent
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends docker-cli systemd ufw fail2ban smartmontools \
+    && apt-get install -y --no-install-recommends ca-certificates docker.io systemd ufw fail2ban smartmontools iputils-ping \
     && rm -rf /var/lib/apt/lists/*
-COPY backend/requirements-agent.txt .
-RUN pip install --no-cache-dir -r requirements-agent.txt
-COPY backend/agent.py .
+
+COPY --from=build /out/nodesentinel /usr/local/bin/nodesentinel
 
 EXPOSE 9100
-CMD ["uvicorn", "agent:app", "--host", "0.0.0.0", "--port", "9100"]
+CMD ["/usr/local/bin/nodesentinel", "agent"]

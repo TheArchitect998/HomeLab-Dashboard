@@ -5,17 +5,15 @@
 !.env.example
 !.env.*.example
 
-venv/
-.venv/
 state/
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
 *.log
 .DS_Store
 *.swp
 *.swo
-/nodesentinel.config.py
-/homelab-dashboard.config.py
+/nodesentinel.config.json
+/homelab-dashboard.config.json
 /Planung.txt
+/Zukunft.txt
+/wechsel.txt

@@ -1,0 +1,17 @@
+{
+  "agents": {
+    "HomeLab1": {
+      "url": "https://homelab1.lan:9100",
+      "key": "replace-with-this-agent's-key",
+      "ca_cert": "/etc/nodesentinel/certs/homelab1.crt"
+    },
+    "HomeLab2": {
+      "url": "http://127.0.0.1:9100"
+    }
+  },
+  "agent_key": "replace-with-a-random-key-shared-by-agents",
+  "poll_seconds": 15,
+  "bind_host": "0.0.0.0",
+  "bind_port": 8888,
+  "state_dir": "/opt/nodesentinel/state"
+}

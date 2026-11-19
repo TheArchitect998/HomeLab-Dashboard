@@ -2,22 +2,33 @@ name: nodesentinel
 
 services:
   dashboard:
-    build: .
-    image: nodesentinel:local
+    image: "${NODESENTINEL_DASHBOARD_IMAGE:-thearchitect998/nodesentinel:latest}"
+    pull_policy: always
     restart: unless-stopped
     environment:
       TZ: "${NODESENTINEL_TIMEZONE:-${HOMELAB_TIMEZONE:-Etc/UTC}}"
-      NODESENTINEL_DASHBOARD_CONFIG: /etc/nodesentinel.py
+      NODESENTINEL_DASHBOARD_CONFIG: /etc/nodesentinel.json
+      NODESENTINEL_TRUSTED_PROXIES: "${NODESENTINEL_TRUSTED_PROXIES:-}"
     ports:
       - "${NODESENTINEL_BIND_ADDRESS:-${HOMELAB_BIND_ADDRESS:-127.0.0.1}}:${NODESENTINEL_PORT:-${HOMELAB_PORT:-8888}}:8888"
     volumes:
       - type: bind
-        source: "${NODESENTINEL_CONFIG_PATH:-${HOMELAB_CONFIG_PATH:-./nodesentinel.config.py}}"
-        target: /etc/nodesentinel.py
+        source: "${NODESENTINEL_CONFIG_PATH:-${HOMELAB_CONFIG_PATH:-./nodesentinel.config.json}}"
+        target: /etc/nodesentinel.json
         read_only: true
         bind:
           create_host_path: false
       - dashboard-state:/opt/nodesentinel/state
+
+      # For self-signed agent certificates, uncomment these lines.
+      # NODESENTINEL_AGENT_CERTS_DIR must contain public certificates only.
+      # Details: README.md#docker-compose
+      # - type: bind
+      #   source: "${NODESENTINEL_AGENT_CERTS_DIR:?Set NODESENTINEL_AGENT_CERTS_DIR}"
+      #   target: /etc/nodesentinel/certs
+      #   read_only: true
+      #   bind:
+      #     create_host_path: false
 
 volumes:
   dashboard-state:

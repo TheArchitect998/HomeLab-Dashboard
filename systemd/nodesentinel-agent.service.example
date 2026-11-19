@@ -7,7 +7,7 @@ Wants=network-online.target
 User=user
 EnvironmentFile=-/etc/nodesentinel-agent.env
 WorkingDirectory=/opt/nodesentinel
-ExecStart=/opt/nodesentinel/venv/bin/uvicorn backend.agent:app --host 0.0.0.0 --port 9100
+ExecStart=/opt/nodesentinel/bin/nodesentinel agent
 Restart=on-failure
 RestartSec=5
 
