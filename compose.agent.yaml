@@ -1,24 +1,52 @@
-name: nodesentinel
+name: nodesentinel-agent
 
 services:
   agent:
-    build:
-      context: .
-      dockerfile: Dockerfile.agent
-    image: nodesentinel-agent:local
+    image: "${NODESENTINEL_AGENT_IMAGE:-thearchitect998/nodesentinel-agent:latest}"
+    pull_policy: always
     restart: unless-stopped
+    # For UFW status, enable host networking and comment out the ports section:
+    # network_mode: host
     environment:
       NODESENTINEL_AGENT_KEY: "${NODESENTINEL_AGENT_KEY:-${HOMELAB_AGENT_KEY:?Set NODESENTINEL_AGENT_KEY before starting the agent}}"
-      NODESENTINEL_JOURNAL_DIR: "${NODESENTINEL_JOURNAL_DIR:-${HOMELAB_JOURNAL_DIR:-}}"
+
+      # Journal: Enter the host directory containing the journal files.
+      # Details: README.md#optional-security-sources
+      # NODESENTINEL_JOURNAL_DIR: /host/root/var/log/journal/<machine-id>
+
+      # Fail2Ban: Set to "1" and verify the host socket path.
+      # Details: README.md#optional-security-sources
+      # NODESENTINEL_ENABLE_FAIL2BAN: "1"
+      # NODESENTINEL_FAIL2BAN_SOCKET: /host/root/run/fail2ban/fail2ban.sock
+
+      # UFW: Also enable host networking, NET_ADMIN, /run, and /etc/ufw.
+      # Details: README.md#optional-security-sources
+      # NODESENTINEL_ENABLE_UFW: "1"
+
+      # S.M.A.R.T.: Also enable SYS_RAWIO and devices.
+      # Details: README.md#hardware-metrics
+      # NODESENTINEL_ENABLE_SMART: "1"
+
+      # HTTPS: Enable the TLS mount and adjust the certificate/key paths in the
+      # container. Keep the private key protected.
+      # Details: README.md#encrypted-agent-communication
+      # NODESENTINEL_AGENT_TLS_CERTFILE: /tls/agent.crt
+      # NODESENTINEL_AGENT_TLS_KEYFILE: /tls/agent.key
     ports:
       - "${NODESENTINEL_AGENT_BIND_ADDRESS:-${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}}:${NODESENTINEL_AGENT_PORT:-${HOMELAB_AGENT_PORT:-9100}}:9100"
     cap_drop:
       - ALL
+    # Enable only the capabilities required by the selected features:
+    # cap_add:
+    #   - NET_ADMIN
+    #   - SYS_RAWIO
     security_opt:
       - no-new-privileges:true
     read_only: true
     tmpfs:
       - /tmp
+      # UFW: Enable together with NET_ADMIN, host networking, and /etc/ufw:
+      # - /run
     volumes:
       - type: bind
         source: /proc
@@ -38,3 +66,23 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      # UFW: Enable only when UFW status is required.
+      # Details: README.md#optional-security-sources
+      # - type: bind
+      #   source: /etc/ufw
+      #   target: /etc/ufw
+      #   read_only: true
+      #   bind:
+      #     create_host_path: false
+      # HTTPS: Point NODESENTINEL_AGENT_TLS_DIR to the host directory.
+      # Details: README.md#encrypted-agent-communication
+      # - type: bind
+      #   source: "${NODESENTINEL_AGENT_TLS_DIR:?Set NODESENTINEL_AGENT_TLS_DIR}"
+      #   target: /tls
+      #   read_only: true
+      #   bind:
+      #     create_host_path: false
+    # S.M.A.R.T.: Enable with NODESENTINEL_ENABLE_SMART and SYS_RAWIO.
+    # Details: README.md#hardware-metrics
+    # devices:
+    #   - "${NODESENTINEL_SMART_DEVICE:-/dev/sda}:${NODESENTINEL_SMART_DEVICE:-/dev/sda}"

@@ -2,8 +2,8 @@ name: nodesentinel
 
 services:
   dashboard:
-    build: .
-    image: nodesentinel:local
+    image: "${NODESENTINEL_DASHBOARD_IMAGE:-thearchitect998/nodesentinel:latest}"
+    pull_policy: always
     restart: unless-stopped
     environment:
       TZ: "${NODESENTINEL_TIMEZONE:-${HOMELAB_TIMEZONE:-Etc/UTC}}"
@@ -19,6 +19,16 @@ services:
         bind:
           create_host_path: false
       - dashboard-state:/opt/nodesentinel/state
+
+      # For self-signed agent certificates, uncomment these lines.
+      # NODESENTINEL_AGENT_CERTS_DIR must contain public certificates only.
+      # Details: README.md#docker-compose
+      # - type: bind
+      #   source: "${NODESENTINEL_AGENT_CERTS_DIR:?Set NODESENTINEL_AGENT_CERTS_DIR}"
+      #   target: /etc/nodesentinel/certs
+      #   read_only: true
+      #   bind:
+      #     create_host_path: false
 
 volumes:
   dashboard-state:
