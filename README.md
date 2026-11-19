@@ -16,6 +16,7 @@ and a daily report with a configurable time help you monitor your homelab.
 - [Architecture](#architecture)
 - [Requirements](#requirements)
 - [Quick Start](#quick-start)
+- [Docker Compose](#docker-compose)
 - [Installation](#installation)
   - [Dashboard Setup](#dashboard-setup)
   - [Agent Setup](#agent-setup)
@@ -165,18 +166,85 @@ are available from Docker Hub as `thearchitect998/nodesentinel` and
 `thearchitect998/nodesentinel-agent`. Use a version tag such as `1.2.3` for
 reproducible deployments; `latest` follows the newest published release.
 
+### Install Docker
+
+On Linux, install Docker Engine and the Docker Compose plugin by following the
+[official Docker Engine installation guide](https://docs.docker.com/engine/install/)
+for your distribution and the
+[Compose plugin instructions](https://docs.docker.com/compose/install/linux/).
+Then verify both commands are available:
+
+```bash
+docker --version
+docker compose version
+```
+
+Get the Compose files and example configuration. This downloads the deployment
+files only; Compose pulls the prebuilt image, so no Go installation or local
+image build is needed:
+
+```bash
+git clone https://github.com/TheArchitect998/NodeSentinel.git
+cd NodeSentinel
+```
+
+Run the commands below from this directory. For Dockhand or Portainer, the
+Compose file can be entered or selected in the stack UI; the dashboard
+configuration must still exist at a readable path on the Docker host (see the
+stack guide below).
+
 The two files `compose.yaml` and `compose.agent.yaml` are ready to use on a
 Raspberry Pi, in Dockhand, Portainer or any other Docker Compose environment.
 They pull the published images and do not require a Git checkout or a local Go
 build.
 
-```bash
-docker compose pull
-docker compose up -d
+### Deploy as a Dockhand or Portainer stack
 
-docker compose -f compose.agent.yaml pull
-docker compose -f compose.agent.yaml up -d
-```
+1. **Prepare the dashboard configuration on the Docker host.** Create the file
+   before deploying the stack because Compose requires the bind-mounted file to
+   exist:
+
+   ```bash
+   sudo install -d -o 10001 -g 10001 -m 0750 /opt/nodesentinel
+   sudo cp nodesentinel.config.example.json /opt/nodesentinel/nodesentinel.config.json
+   sudo chown 10001:10001 /opt/nodesentinel/nodesentinel.config.json
+   sudo chmod 600 /opt/nodesentinel/nodesentinel.config.json
+   sudoedit /opt/nodesentinel/nodesentinel.config.json
+   ```
+
+   Replace the example agent entries with your agents and set a strong
+   `agent_key`. The dashboard container runs as UID/GID 10001 and needs to read
+   this file.
+
+2. **Create the dashboard stack.** In Portainer, open **Stacks > Add stack**;
+   in Dockhand, create a new stack. Select the Git repository or paste/upload
+   `compose.yaml`. Add this stack environment variable, pointing to the
+   configuration file created above:
+
+   ```text
+   NODESENTINEL_CONFIG_PATH=/opt/nodesentinel/nodesentinel.config.json
+   ```
+
+   Deploy the stack. Compose pulls the published dashboard image automatically.
+   Keep the same stack/project name when updating so the `dashboard-state`
+   volume remains attached.
+
+3. **Set the dashboard password.** Open a terminal/console for the running
+   dashboard container and run:
+
+   ```text
+   /usr/local/bin/nodesentinel dashboard setup
+   ```
+
+   Follow the prompts, then open the dashboard at `http://<docker-host>:8888`.
+   The default bind address is localhost; set `NODESENTINEL_BIND_ADDRESS` to
+   the Docker host's LAN address in the stack environment to access it remotely.
+
+4. **Deploy agents.** On each monitored Linux host, create another stack from
+   `compose.agent.yaml`. Set `NODESENTINEL_AGENT_KEY` in that stack's
+   environment to the same value as `agent_key` in the dashboard configuration.
+   Set `NODESENTINEL_AGENT_BIND_ADDRESS` to the host's LAN address if the
+   dashboard connects remotely, then deploy the stack.
 
 Override `NODESENTINEL_DASHBOARD_IMAGE` or `NODESENTINEL_AGENT_IMAGE` to pin a
 specific release tag.
@@ -187,10 +255,11 @@ specific release tag.
 cp nodesentinel.config.example.json nodesentinel.config.json
 ```
 
-Edit `nodesentinel.config.json`: set the agent addresses and a strong
-`agent_key` shared with the agents. Protect this file; it may contain secrets.
-The container runs as UID/GID 10001 and must be able to read it. Agent
-`127.0.0.1` addresses refer to the dashboard container itself.
+Edit `nodesentinel.config.json`: replace the example agent entries with the
+addresses of your agents and set a strong `agent_key` to share with them.
+Protect this file; it may contain secrets. The container runs as UID/GID 10001
+and must be able to read it. Agent `127.0.0.1` addresses refer to the dashboard
+container itself.
 
 By default, Compose mounts `./nodesentinel.config.json` relative to the
 Compose project. Set `NODESENTINEL_CONFIG_PATH` to an absolute path on the Docker
@@ -200,9 +269,15 @@ exist, and UID/GID 10001 must be able to traverse its parent directories and
 read it. Do not commit the configuration file or its secrets.
 
 ```bash
+docker compose pull
 docker compose run --rm dashboard /usr/local/bin/nodesentinel dashboard setup
 docker compose up -d
+docker compose ps
 ```
+
+The setup command prompts you to create the dashboard password. After startup,
+open `http://localhost:8888` (or the configured bind address and port) and sign
+in.
 
 The dashboard listens on `127.0.0.1:8888` by default. Set
 `NODESENTINEL_BIND_ADDRESS` and optionally `NODESENTINEL_PORT` for a protected LAN.
@@ -224,8 +299,10 @@ continues to use the existing `dashboard-state` volume.
 
 ### Agent
 
-On each monitored Linux host, create a protected `.env` file containing the
-same key as the dashboard:
+On each monitored Linux host, place `compose.agent.yaml` in a deployment
+directory (clone the repository there or copy the file from the dashboard
+deployment). Create a `.env` file in that directory containing the same key as
+the dashboard:
 
 ```env
 NODESENTINEL_AGENT_KEY=replace-with-a-strong-random-key
@@ -236,6 +313,7 @@ NODESENTINEL_AGENT_BIND_ADDRESS=127.0.0.1
 chmod 600 .env
 docker compose -f compose.agent.yaml pull
 docker compose -f compose.agent.yaml up -d
+docker compose -f compose.agent.yaml ps
 ```
 
 Set `NODESENTINEL_AGENT_BIND_ADDRESS` to a suitable LAN IP for remote dashboard
