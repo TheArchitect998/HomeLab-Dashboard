@@ -1557,8 +1557,8 @@
               <div class="host-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
               <div class="host-status ${online ? '' : 'offline'}"><span class="dot"></span> ${online ? t('online') : t('offline')}</div>
             </div>
-            ${[[t('cpu'), host.cpu_percent, false], [t('ram'), host.ram_percent, false], [t('disk'), host.storage_percent, false], [t('temperature'), host.temperature_c, true]].map(([label, value, isTemperature]) => `
-              <div class="host-stat"><span>${label}</span>${online ? (isTemperature ? formatTemperature(finite(value)) : formatPercent(finite(value))) : '—'}</div>
+            ${[[t('cpu'), host.cpu_percent, false, ''], [t('ram'), host.ram_percent, false, ''], [t('disk'), host.storage_percent, false, host.storage_error], [t('temperature'), host.temperature_c, true, '']].map(([label, value, isTemperature, reason]) => `
+              <div class="host-stat"${reason ? ` title="${escapeHtml(reason)}"` : ''}><span>${label}</span>${online ? (isTemperature ? formatTemperature(finite(value)) : formatPercent(finite(value))) : '—'}</div>
             `).join('')}
           </div>`;
         }).join('');

@@ -1,9 +1,8 @@
 {
   "agents": {
     "HomeLab1": {
-      "url": "https://homelab1.lan:9100",
-      "key": "replace-with-this-agent's-key",
-      "ca_cert": "/etc/nodesentinel/certs/homelab1.crt"
+      "mode": "push",
+      "key": "replace-with-a-unique-agent-key"
     },
     "HomeLab2": {
       "url": "http://127.0.0.1:9100"

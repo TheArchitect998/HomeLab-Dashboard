@@ -4,12 +4,21 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=user
+User=nodesentinel
 EnvironmentFile=-/etc/nodesentinel-agent.env
 WorkingDirectory=/opt/nodesentinel
 ExecStart=/opt/nodesentinel/bin/nodesentinel agent
 Restart=on-failure
 RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictSUIDSGID=yes
 
 [Install]
 WantedBy=multi-user.target

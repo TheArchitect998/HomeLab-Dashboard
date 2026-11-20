@@ -5,19 +5,31 @@ services:
     image: "${NODESENTINEL_AGENT_IMAGE:-thearchitect998/nodesentinel-agent:latest}"
     pull_policy: always
     restart: unless-stopped
-    # For UFW status, enable host networking and comment out the ports section:
+    # UFW and host network statistics require:
     # network_mode: host
     environment:
       NODESENTINEL_AGENT_KEY: "${NODESENTINEL_AGENT_KEY:-${HOMELAB_AGENT_KEY:?Set NODESENTINEL_AGENT_KEY before starting the agent}}"
+      NODESENTINEL_AGENT_NAME: "${NODESENTINEL_AGENT_NAME:?Set the push agent name configured in the dashboard}"
+      NODESENTINEL_HUB_URL: "${NODESENTINEL_HUB_URL:?Set the dashboard wss:// URL}"
+      # Optional private dashboard CA certificate:
+      # NODESENTINEL_HUB_CA_CERT: /tls/hub-ca.crt
+      # NODESENTINEL_AGENT_PUSH_SECONDS: "15"
 
-      # Journal: Enter the host directory containing the journal files.
+      # Root filesystem usage: enable this and the host-root mount below.
+      # NODESENTINEL_ENABLE_HOST_ROOT: "1"
+
+      # Docker status and events: enable this and the Docker socket below.
+      # NODESENTINEL_ENABLE_DOCKER: "1"
+
+      # Journal: enable this and mount only the host journal directory below.
       # Details: README.md#optional-security-sources
-      # NODESENTINEL_JOURNAL_DIR: /host/root/var/log/journal/<machine-id>
+      # NODESENTINEL_ENABLE_JOURNAL: "1"
+      # NODESENTINEL_JOURNAL_DIR: /host/journal
 
       # Fail2Ban: Set to "1" and verify the host socket path.
       # Details: README.md#optional-security-sources
       # NODESENTINEL_ENABLE_FAIL2BAN: "1"
-      # NODESENTINEL_FAIL2BAN_SOCKET: /host/root/run/fail2ban/fail2ban.sock
+      # NODESENTINEL_FAIL2BAN_SOCKET: /host/fail2ban/fail2ban.sock
 
       # UFW: Also enable host networking, NET_ADMIN, /run, and /etc/ufw.
       # Details: README.md#optional-security-sources
@@ -27,13 +39,6 @@ services:
       # Details: README.md#hardware-metrics
       # NODESENTINEL_ENABLE_SMART: "1"
 
-      # HTTPS: Enable the TLS mount and adjust the certificate/key paths in the
-      # container. Keep the private key protected.
-      # Details: README.md#encrypted-agent-communication
-      # NODESENTINEL_AGENT_TLS_CERTFILE: /tls/agent.crt
-      # NODESENTINEL_AGENT_TLS_KEYFILE: /tls/agent.key
-    ports:
-      - "${NODESENTINEL_AGENT_BIND_ADDRESS:-${HOMELAB_AGENT_BIND_ADDRESS:-127.0.0.1}}:${NODESENTINEL_AGENT_PORT:-${HOMELAB_AGENT_PORT:-9100}}:9100"
     cap_drop:
       - ALL
     # Enable only the capabilities required by the selected features:
@@ -54,18 +59,34 @@ services:
         read_only: true
         bind:
           create_host_path: false
-      - type: bind
-        source: /
-        target: /host/root
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: /var/run/docker.sock
-        target: /var/run/docker.sock
-        read_only: true
-        bind:
-          create_host_path: false
+      # Host root: exposes host files even though the mount is read-only.
+      # - type: bind
+      #   source: /
+      #   target: /host/root
+      #   read_only: true
+      #   bind:
+      #     create_host_path: false
+      # Docker socket: root-equivalent access even with read_only.
+      # - type: bind
+      #   source: /var/run/docker.sock
+      #   target: /var/run/docker.sock
+      #   read_only: true
+      #   bind:
+      #     create_host_path: false
+      # Journal: restrict this path to the host's actual journal directory.
+      # - type: bind
+      #   source: /var/log/journal/<machine-id>
+      #   target: /host/journal
+      #   read_only: true
+      #   bind:
+      #     create_host_path: false
+      # Fail2Ban socket: grants administrative access to Fail2Ban.
+      # - type: bind
+      #   source: /run/fail2ban
+      #   target: /host/fail2ban
+      #   read_only: true
+      #   bind:
+      #     create_host_path: false
       # UFW: Enable only when UFW status is required.
       # Details: README.md#optional-security-sources
       # - type: bind
@@ -74,10 +95,9 @@ services:
       #   read_only: true
       #   bind:
       #     create_host_path: false
-      # HTTPS: Point NODESENTINEL_AGENT_TLS_DIR to the host directory.
-      # Details: README.md#encrypted-agent-communication
+      # TLS: mount a public CA certificate when the dashboard uses a private CA.
       # - type: bind
-      #   source: "${NODESENTINEL_AGENT_TLS_DIR:?Set NODESENTINEL_AGENT_TLS_DIR}"
+      #   source: "${NODESENTINEL_HUB_CA_DIR:?Set NODESENTINEL_HUB_CA_DIR}"
       #   target: /tls
       #   read_only: true
       #   bind:

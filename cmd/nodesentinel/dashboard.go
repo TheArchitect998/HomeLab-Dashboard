@@ -54,6 +54,7 @@ type agentConfig struct {
 	URL    string `json:"url"`
 	Key    string `json:"key"`
 	CACert string `json:"ca_cert"`
+	Mode   string `json:"mode"`
 }
 
 type dashboardConfig struct {
@@ -73,20 +74,20 @@ type dashboardStore struct {
 }
 
 type dashboard struct {
-	store               *dashboardStore
-	agents              map[string]agentConfig
-	agentKey            string
-	pollInterval        time.Duration
-	mu                  sync.Mutex
-	sessions            map[string]time.Time
-	loginAttempts       map[string][]time.Time
-	providerState       map[string]providerFailure
-	providerLocks       map[string]*sync.Mutex
-	checkStatus         map[string]map[string]any
-	checkFailures       map[string]int
-	hardwareCheck       map[string]time.Time
-	notificationCursors map[string]map[string]int64
-	background          sync.WaitGroup
+	store         *dashboardStore
+	agents        map[string]agentConfig
+	agentKey      string
+	pollInterval  time.Duration
+	mu            sync.Mutex
+	sessions      map[string]time.Time
+	loginAttempts map[string][]time.Time
+	providerState map[string]providerFailure
+	providerLocks map[string]*sync.Mutex
+	checkStatus   map[string]map[string]any
+	checkFailures map[string]int
+	hardwareCheck map[string]time.Time
+	pushAgents    map[string]*pushSession
+	background    sync.WaitGroup
 }
 
 type providerFailure struct {
@@ -108,6 +109,7 @@ func runDashboard() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer func() {
 		stop()
+		service.closePushAgents()
 		service.background.Wait()
 	}()
 	service.startBackground(ctx)
@@ -158,9 +160,27 @@ func readDashboardConfig() (dashboardConfig, error) {
 		if cfg.PollSeconds <= 0 {
 			cfg.PollSeconds = 15
 		}
+		pushKeys := make(map[string]string)
 		for name, item := range cfg.Agents {
 			item.URL = normalizeAgentURL(item.URL)
-			if item.URL == "" {
+			if item.Mode != "" && item.Mode != "pull" && item.Mode != "push" {
+				return cfg, fmt.Errorf("agent %q has an invalid mode", name)
+			}
+			if item.Mode == "push" {
+				if !validPushName(name) {
+					return cfg, fmt.Errorf("push agent %q has an invalid name", name)
+				}
+				if !validPushKey(item.Key) {
+					return cfg, fmt.Errorf("push agent %q requires its own key of at least 16 characters", name)
+				}
+				if other, exists := pushKeys[item.Key]; exists {
+					return cfg, fmt.Errorf("push agents %q and %q must use different keys", other, name)
+				}
+				pushKeys[item.Key] = name
+				if item.URL != "" || item.CACert != "" {
+					return cfg, fmt.Errorf("push agent %q must not have a URL or CA certificate", name)
+				}
+			} else if item.URL == "" {
 				return cfg, fmt.Errorf("agent %q has an empty URL", name)
 			}
 			cfg.Agents[name] = item
@@ -199,7 +219,7 @@ func newDashboard(store *dashboardStore, cfg dashboardConfig) *dashboard {
 		providerState: make(map[string]providerFailure), checkStatus: make(map[string]map[string]any),
 		providerLocks: make(map[string]*sync.Mutex),
 		checkFailures: make(map[string]int), hardwareCheck: make(map[string]time.Time),
-		notificationCursors: make(map[string]map[string]int64),
+		pushAgents: make(map[string]*pushSession),
 	}
 }
 
@@ -281,6 +301,7 @@ var monitoringSchemaStatements = []string{
 	`CREATE TABLE IF NOT EXISTS provider_reports (host TEXT, provider TEXT, day TEXT, PRIMARY KEY(host, provider, day))`,
 	`CREATE TABLE IF NOT EXISTS provider_hardware (host TEXT, provider TEXT, issues TEXT, last_sent REAL, PRIMARY KEY(host, provider))`,
 	`CREATE TABLE IF NOT EXISTS provider_checks (name TEXT, provider TEXT, down INTEGER, PRIMARY KEY(name, provider))`,
+	`CREATE TABLE IF NOT EXISTS notification_cursors (host TEXT, provider TEXT, kind TEXT, until_time INTEGER NOT NULL, PRIMARY KEY(host, provider, kind))`,
 	`CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY)`,
 }
 
@@ -388,6 +409,7 @@ func (d *dashboard) handler() http.Handler {
 	mux.HandleFunc("GET /api/history/containers", d.containerHistory)
 	mux.HandleFunc("GET /api/checks", d.getChecks)
 	mux.HandleFunc("PUT /api/checks", d.setChecks)
+	mux.HandleFunc("GET /api/agent/connect", d.connectAgent)
 	return securityHeaders(d.protectAPI(mux))
 }
 
@@ -402,7 +424,8 @@ func (d *dashboard) protectAPI(next http.Handler) http.Handler {
 					return
 				}
 			}
-			if r.URL.Path != "/api/auth/status" && r.URL.Path != "/api/auth/login" && !d.requireSession(w, r) {
+			if r.URL.Path != "/api/auth/status" && r.URL.Path != "/api/auth/login" &&
+				r.URL.Path != "/api/agent/connect" && !d.requireSession(w, r) {
 				return
 			}
 		}
@@ -1226,6 +1249,14 @@ func (d *dashboard) agentRequest(ctx context.Context, item agentConfig, path str
 }
 
 func (d *dashboard) fetchAgent(ctx context.Context, name string, item agentConfig) (string, map[string]any) {
+	if item.Mode == "push" {
+		data, err := d.pushedMetrics(name)
+		if err != nil {
+			return name, map[string]any{"online": false, "error": err.Error()}
+		}
+		data["online"] = true
+		return name, data
+	}
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	response, err := d.agentRequest(ctx, item, "/api/metrics")
