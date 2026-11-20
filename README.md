@@ -61,7 +61,7 @@ Der Screenshot verwendet synthetische Beispieldaten.
 │  │       Aggregates metrics from agents        │  │
 │  └─────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────┘
-                         ↓
+                         ↑
          ┌───────────────┬───────────────┐
          ↓               ↓               ↓
     ┌─────────┐     ┌─────────┐     ┌─────────┐
@@ -73,9 +73,15 @@ Der Screenshot verwendet synthetische Beispieldaten.
 **How it works:**
 1. Dashboard runs a Go HTTP server and serves the web UI
 2. One or more lightweight Go agents run on monitored devices
-3. Agents expose `/api/metrics` endpoint
-4. Dashboard polls agents and aggregates the data
+3. New agents open an outbound authenticated WebSocket and push metrics to the dashboard
+4. The dashboard reads the latest received sample and requests event time ranges over the same connection
 5. Web UI auto-refreshes every 15 seconds
+
+Existing HTTP-pull agents remain supported. An agent without `NODESENTINEL_HUB_URL`
+uses the legacy HTTP listener; the supplied new-agent configuration uses push.
+Use `wss://` for remote connections. Plain `ws://` is allowed only to loopback.
+Measurements are not buffered while disconnected; the dashboard marks stale
+or disconnected agents offline and resumes history with new samples on reconnect.
 
 ---
 
@@ -115,20 +121,25 @@ For Docker deployment, skip the native build and use [Docker Compose](#docker-co
 
 ```bash
 cp .env.example .env
-# Edit .env and add your agent URLs
+cp nodesentinel.config.example.json nodesentinel.config.json
+# Edit .env and configure push agents with unique keys in the JSON file
 nano .env
+nano nodesentinel.config.json
 ```
 
 Example `.env`:
 ```env
 NODESENTINEL_DASHBOARD_HOST=0.0.0.0
 NODESENTINEL_DASHBOARD_PORT=8888
-AGENT_URLS='["http://pi-1.local:9100/api/metrics","http://pi-2.local:9100/api/metrics"]'
-AGENT_KEY=your-long-random-agent-key
+NODESENTINEL_DASHBOARD_CONFIG=./nodesentinel.config.json
 NODESENTINEL_STATE_DIR=/opt/nodesentinel/state
 ```
 
-`AGENT_KEY` must match `NODESENTINEL_AGENT_KEY` on each agent. Protect `.env` from other users. `AGENT_URLS` accepts the existing `/api/metrics` URLs or agent base URLs; names remain `agent-1`, `agent-2`, and so on.
+Set each push agent's `mode` to `push` and its own random `key` of at least
+16 characters. The agent's name and `NODESENTINEL_AGENT_KEY` must match the
+JSON entry. Remove example agents you do not use. Protect both configuration
+files from other users. For existing pull agents, `AGENT_URLS` remains supported
+when no dashboard JSON configuration is selected.
 
 ### 4. Set the first password locally
 
@@ -138,6 +149,8 @@ The state directory must be writable only by the dashboard service user. Replace
 sudo install -d -o user -g user -m 0700 /opt/nodesentinel/state
 sudo chown user:user .env
 sudo chmod 600 .env
+sudo chown user:user nodesentinel.config.json
+sudo chmod 600 nodesentinel.config.json
 set -a
 source .env
 set +a
@@ -212,9 +225,8 @@ build.
    sudoedit /opt/nodesentinel/nodesentinel.config.json
    ```
 
-   Replace the example agent entries with your agents and set a strong
-   `agent_key`. The dashboard container runs as UID/GID 10001 and needs to read
-   this file.
+   Replace the example agent entries with named push agents and unique strong
+   keys. The dashboard container runs as UID/GID 10001 and needs to read this file.
 
 2. **Create the dashboard stack.** In Portainer, open **Stacks > Add stack**;
    in Dockhand, create a new stack. Select the Git repository or paste/upload
@@ -241,10 +253,10 @@ build.
    the Docker host's LAN address in the stack environment to access it remotely.
 
 4. **Deploy agents.** On each monitored Linux host, create another stack from
-   `compose.agent.yaml`. Set `NODESENTINEL_AGENT_KEY` in that stack's
-   environment to the same value as `agent_key` in the dashboard configuration.
-   Set `NODESENTINEL_AGENT_BIND_ADDRESS` to the host's LAN address if the
-   dashboard connects remotely, then deploy the stack.
+   `compose.agent.yaml`. Set `NODESENTINEL_AGENT_NAME` and
+   `NODESENTINEL_AGENT_KEY` to the matching dashboard push entry, and set
+   `NODESENTINEL_HUB_URL` to the dashboard's reachable `wss://` URL. Configure
+   HTTPS on the dashboard or a WebSocket-capable reverse proxy first.
 
 Override `NODESENTINEL_DASHBOARD_IMAGE` or `NODESENTINEL_AGENT_IMAGE` to pin a
 specific release tag.
@@ -255,8 +267,8 @@ specific release tag.
 cp nodesentinel.config.example.json nodesentinel.config.json
 ```
 
-Edit `nodesentinel.config.json`: replace the example agent entries with the
-addresses of your agents and set a strong `agent_key` to share with them.
+Edit `nodesentinel.config.json`: replace the example agent entries with named
+push agents and a different strong `key` for each one.
 Protect this file; it may contain secrets. The container runs as UID/GID 10001
 and must be able to read it. Agent `127.0.0.1` addresses refer to the dashboard
 container itself.
@@ -301,12 +313,12 @@ continues to use the existing `dashboard-state` volume.
 
 On each monitored Linux host, place `compose.agent.yaml` in a deployment
 directory (clone the repository there or copy the file from the dashboard
-deployment). Create a `.env` file in that directory containing the same key as
-the dashboard:
+deployment). Create a `.env` file containing the matching push name and key:
 
 ```env
 NODESENTINEL_AGENT_KEY=replace-with-a-strong-random-key
-NODESENTINEL_AGENT_BIND_ADDRESS=127.0.0.1
+NODESENTINEL_AGENT_NAME=HomeLab1
+NODESENTINEL_HUB_URL=wss://dashboard.example
 ```
 
 ```bash
@@ -316,56 +328,45 @@ docker compose -f compose.agent.yaml up -d
 docker compose -f compose.agent.yaml ps
 ```
 
-Set `NODESENTINEL_AGENT_BIND_ADDRESS` to a suitable LAN IP for remote dashboard
-access and restrict port 9100 with the host firewall. Without TLS, agent
-communication is unencrypted; enable HTTPS (see
-[Encrypted agent communication](#encrypted-agent-communication)) or use an
-encrypted tunnel.
+The dashboard URL must resolve from the agent container. Configure a reverse
+proxy for WebSocket upgrades and HTTPS, or enable dashboard TLS directly.
+For a private CA, uncomment the CA mount and `NODESENTINEL_HUB_CA_CERT` in
+`compose.agent.yaml`. The agent verifies the dashboard certificate. Push mode
+does not expose an inbound agent port.
 
 The agent refuses to start without `NODESENTINEL_AGENT_KEY` of at least 16
 characters (the example value `change-me` is rejected). Generate one with
 `openssl rand -base64 32`.
 
-The agent reads host metrics and Docker status. Journal event collection and
-UFW and Fail2Ban status checks are disabled by default. Unavailable sources are
-shown as unavailable. Docker Desktop reports the Docker Linux VM, not the
-Windows or macOS host.
+The default container mounts only host `/proc` read-only. Docker, host root
+filesystem usage, journal, UFW, Fail2Ban and S.M.A.R.T. are disabled by default.
+Unavailable sources are shown as unavailable. Container network counters describe
+the container network namespace unless host networking is enabled. Even read-only
+`/proc` access can expose process metadata; run only trusted agent images.
 
-**Security:** Docker socket access effectively grants host-root privileges,
-even when the socket mount is read-only. The read-only host-root mount may
-expose sensitive files. Only run trusted images and restrict agent access.
+**Security:** Opting into Docker socket access effectively grants host-root
+privileges, even when the socket mount is read-only. Opting into a read-only
+host-root mount can expose sensitive files. Only run trusted images.
 
 #### Optional security sources
 
-Journal event collection and UFW and Fail2Ban status checks are disabled by
-default. The existing read-only host-root mount may nevertheless expose
-sensitive files, including system logs, to the container.
+For Docker, set `NODESENTINEL_ENABLE_DOCKER=1` and enable the Docker socket
+mount. For root filesystem usage, set `NODESENTINEL_ENABLE_HOST_ROOT=1` and
+enable the host-root mount. Each grants the access described above.
 
-For SSH and Fail2Ban events, set `NODESENTINEL_JOURNAL_DIR` to the host journal
-directory as seen through the existing `/host/root` mount, for example
-`/host/root/var/log/journal/<machine-id>` or
-`/host/root/run/log/journal/<machine-id>`. Choose the directory on each host
-that actually contains its `.journal` files and verify that the container can
-read them. Collection fails if the directory or journal files are unavailable.
-Journal access exposes sensitive logs.
-
-HTTPS, journal, UFW, Fail2Ban and S.M.A.R.T. are optional examples in
-`compose.agent.yaml`. Uncomment only the environment variables, capabilities,
-mounts or devices needed on that host. HTTPS additionally requires an
-`NODESENTINEL_AGENT_TLS_DIR` containing `agent.crt` and `agent.key`.
+For SSH and Fail2Ban events, set `NODESENTINEL_ENABLE_JOURNAL=1`, mount only the
+directory containing the host's `.journal` files at `/host/journal`, and set
+`NODESENTINEL_JOURNAL_DIR=/host/journal`. Verify the container can read it.
+Journal access exposes sensitive logs; missing files cause an explicit error.
 
 For UFW status, enable host networking, the `NET_ADMIN` capability,
-`NODESENTINEL_ENABLE_UFW=1` and the read-only `/etc/ufw` mount. Comment out the
-`ports` section when using host networking. The agent then listens on
-`NODESENTINEL_AGENT_BIND_ADDRESS` and `NODESENTINEL_AGENT_PORT` directly on the
-host; the defaults are `127.0.0.1` and `9100`. Select a suitable host address
-and restrict access with the host firewall. `NET_ADMIN` allows changes to the
-host firewall; host networking and compatible UFW/iptables versions are
-required.
+`NODESENTINEL_ENABLE_UFW=1`, the `/run` tmpfs and read-only `/etc/ufw` mount.
+`NET_ADMIN` allows changes to the host firewall; host networking and compatible
+UFW/iptables versions are required. Push mode still opens no agent listener.
 
-To enable Fail2Ban status, uncomment
-`NODESENTINEL_ENABLE_FAIL2BAN=1` on hosts running Fail2Ban. The agent connects to
-`/run/fail2ban/fail2ban.sock` through the existing host-root mount. Socket
+To enable Fail2Ban status, uncomment `NODESENTINEL_ENABLE_FAIL2BAN=1` and the
+separate Fail2Ban directory mount. The agent connects to
+`/host/fail2ban/fail2ban.sock`. Socket
 access allows administrative commands even with a read-only mount. The client
 in the image must be compatible with the host's Fail2Ban server. On hosts
 without Fail2Ban, leave the setting disabled.
@@ -392,7 +393,9 @@ passes SMART commands through.
 
 - Native: install `smartmontools`, enable the commented `NODESENTINEL_SMART` lines in
   `systemd/nodesentinel.sudoers` and set `NODESENTINEL_ENABLE_SMART=1` in
-  `/etc/nodesentinel-agent.env`.
+  `/etc/nodesentinel-agent.env`. The hardened systemd example prevents sudo
+  privilege elevation; enabling it requires a deliberate service override or a
+  separately restricted privileged helper.
 - Docker Compose: uncomment the S.M.A.R.T. environment variable, `SYS_RAWIO`
   capability and matching `devices` entry in `compose.agent.yaml`.
 
@@ -427,21 +430,16 @@ go build -o bin/nodesentinel ./cmd/nodesentinel
 ```bash
 # Copy example configuration
 cp .env.example .env
+cp nodesentinel.config.example.json nodesentinel.config.json
 
-# Edit with your agent URLs
+# Edit the named push-agent entries and their unique keys
 nano .env
+nano nodesentinel.config.json
 ```
 
-Set your agent URLs (hostnames or IPs):
-```env
-NODESENTINEL_DASHBOARD_HOST=0.0.0.0
-NODESENTINEL_DASHBOARD_PORT=8888
-AGENT_URLS='["http://192.168.1.100:9100/api/metrics","http://192.168.1.101:9100/api/metrics"]'
-AGENT_KEY=your-long-random-agent-key
-NODESENTINEL_STATE_DIR=/opt/nodesentinel/state
-```
-
-Create the state directory and set the initial password as described in [Quick Start](#4-set-the-first-password-locally). Configure the same key on every agent.
+Create the state directory and set the initial password as described in
+[Quick Start](#4-set-the-first-password-locally). Configure a unique matching
+name and key on each agent.
 
 #### Step 3: Test locally
 
@@ -481,19 +479,27 @@ go build -o bin/nodesentinel ./cmd/nodesentinel
 # Copy example configuration
 cp nodesentinel-agent.env.example nodesentinel-agent.env
 
-# Edit with a secure key
+# Edit the dashboard URL, agent name and secure key
 nano nodesentinel-agent.env
 ```
 
-Set a strong key:
+Set the name and key from the dashboard JSON configuration:
 ```env
 NODESENTINEL_AGENT_KEY=your-secure-random-key-here
+NODESENTINEL_AGENT_NAME=HomeLab1
+NODESENTINEL_HUB_URL=wss://dashboard.example
 ```
 
 #### Step 3: Configure optional security access
 
-To read UFW and Fail2Ban status, review the provided sudoers template and
-adjust its username and command paths for your host before installing it:
+Docker, journal, UFW, Fail2Ban and SMART are opt-in. For Docker, explicitly set
+`NODESENTINEL_ENABLE_DOCKER=1` and grant Docker access only if its root-equivalent
+privileges are acceptable. For SSH and Fail2Ban events, set
+`NODESENTINEL_ENABLE_JOURNAL=1` and grant the service user journal read access.
+
+To read UFW and Fail2Ban status, set the corresponding `NODESENTINEL_ENABLE_UFW=1`
+or `NODESENTINEL_ENABLE_FAIL2BAN=1` and review the provided sudoers template.
+Adjust its username and command paths for your host before installing it:
 
 ```bash
 sudo install -m 0440 systemd/nodesentinel.sudoers /etc/sudoers.d/nodesentinel
@@ -501,9 +507,10 @@ sudo visudo -cf /etc/sudoers.d/nodesentinel
 ```
 
 The template permits specific status commands rather than unrestricted access
-to UFW and Fail2Ban. Journal access for SSH and Fail2Ban event notifications
-must be configured separately. Grant it only after considering that system
-logs can contain sensitive information.
+to UFW and Fail2Ban. The hardened systemd example has `NoNewPrivileges=yes`,
+which blocks sudo elevation; choose a deliberately restricted privileged helper
+or service override if these sources are needed. Journal access can expose
+sensitive system logs.
 
 #### Step 4: Test locally
 
@@ -514,10 +521,8 @@ set +a
 ./bin/nodesentinel agent
 ```
 
-Test the agent:
-```bash
-curl -H "X-Agent-Key: $NODESENTINEL_AGENT_KEY" http://localhost:9100/api/metrics
-```
+The agent logs connection errors and retries. Verify that the matching host
+appears online in the dashboard. Push mode does not start an HTTP listener.
 
 ---
 
@@ -551,7 +556,16 @@ sudo systemctl status nodesentinel.service
 
 #### Agent Service
 
-Copy the example service file on **each agent host**:
+Create a dedicated unprivileged user and install the protected agent
+configuration on **each agent host**. Make sure `/opt/nodesentinel` and the
+agent binary are readable and executable by that user:
+
+```bash
+sudo useradd --system --user-group --no-create-home --shell /usr/sbin/nologin nodesentinel
+sudo install -o nodesentinel -g nodesentinel -m 0600 nodesentinel-agent.env /etc/nodesentinel-agent.env
+```
+
+Skip user creation if the account already exists. Copy the example service:
 
 ```bash
 sudo cp systemd/nodesentinel-agent.service.example /etc/systemd/system/nodesentinel-agent.service
@@ -563,9 +577,9 @@ sudo nano /etc/systemd/system/nodesentinel-agent.service
 ```
 
 Key settings to verify:
-- `User=` (your username)
+- `User=nodesentinel` (a dedicated, non-root service account)
 - `WorkingDirectory=` (path to cloned repo)
-- `EnvironmentFile=` (path to nodesentinel-agent.env)
+- `EnvironmentFile=` (`/etc/nodesentinel-agent.env`, readable only by the service account)
 
 Enable and start:
 ```bash
@@ -628,6 +642,17 @@ systemd unit commands. Docker users can rebuild and recreate the corresponding
 Compose services instead. Verify login, agent connectivity, notification
 settings and existing history afterwards.
 
+Existing HTTP-pull configurations continue to work when `NODESENTINEL_HUB_URL`
+is unset. Docker, journal, UFW and Fail2Ban now require explicit enable flags;
+container root filesystem usage also requires the opt-in mount and flag. To
+migrate to push, configure a named `mode: "push"` agent and unique key in the
+dashboard JSON, then set the matching name, key and `wss://` hub URL on that
+agent. The supplied new Compose example uses push and no inbound agent port.
+To keep pull when adopting that example, remove the required `HUB_URL` and
+`AGENT_NAME` environment entries and explicitly add a restricted port mapping;
+retain the legacy dashboard URL and agent TLS settings. Configure the opt-in
+flags and mounts needed by the previous installation.
+
 ### Updating the Dashboard UI
 
 For a UI-only update, use a frontend version compatible with the installed
@@ -642,14 +667,19 @@ service restart is not required for a UI-only update.
 
 ### Adding/Removing Agents
 
-Edit `.env` on the **dashboard** host:
+Edit `nodesentinel.config.json` on the **dashboard** host:
 
-```env
-# Add more agents by appending URLs to the JSON list
-AGENT_URLS='["http://pi-1.local:9100/api/metrics","http://pi-2.local:9100/api/metrics","http://nas.local:9100/api/metrics"]'
+```json
+{
+  "agents": {
+    "host1": {"mode": "push", "key": "replace-with-a-unique-random-key"},
+    "old-host": {"url": "https://old-host:9100", "key": "existing-pull-agent-key"}
+  }
+}
 ```
 
-Then restart the dashboard:
+Restart the dashboard and configure the push agent with the same name and key.
+Legacy `AGENT_URLS` remains available when no JSON configuration is selected.
 ```bash
 sudo systemctl restart nodesentinel.service
 ```
@@ -713,10 +743,17 @@ it is retried when possible on the same day. Incomplete event or temperature
 coverage is marked in the report.
 
 SSH and Fail2Ban events require readable host journal entries; Docker events
-require access to the Docker socket. Grant these permissions deliberately:
+require access to the Docker socket and the corresponding enable flags. Grant
+these permissions deliberately:
 journal access exposes potentially sensitive logs, and Docker socket access
 effectively grants host-root privileges. Container agents need the relevant
 optional host access enabled separately.
+
+Event notification cursors persist across dashboard restarts. On reconnection,
+the dashboard requests the missed time range from the agent's local source.
+Recovery is limited by that source's retention (Docker's event history is
+bounded); unavailable or expired source data cannot be reconstructed. If
+notification delivery partially fails, retries can result in duplicates.
 
 Settings, provider credentials and monitoring databases are stored in the
 dashboard state directory. Protect and back up this directory. Resource history
@@ -727,63 +764,25 @@ samples are retained for approximately 25 hours. Run one dashboard worker only.
 
 **Dashboard port:** Set `NODESENTINEL_DASHBOARD_PORT` in the environment or `bind_port` in the JSON dashboard config.
 
-**Agent port:**
+**Agent port (legacy HTTP-pull mode only):**
 Set `NODESENTINEL_AGENT_PORT` in the agent environment file and update the
 dashboard agent URL. For host-network Compose overlays, set the same variable:
 ```ini
 NODESENTINEL_AGENT_PORT=9100
 ```
 
-Then update all agent URLs in the dashboard `.env`.
+Then update the corresponding legacy agent URL in the dashboard configuration.
 
 ---
 
 ## Deployment Options
 
-### Option 1: Dashboard + Agent on Same Device (Single Device Setup)
-
-Simplest setup if you only want to monitor one machine.
-
-```env
-AGENT_URLS='["http://localhost:9100/api/metrics"]'
-```
-
-Run both dashboard and agent services on the same Pi.
-
----
-
-### Option 2: Central Dashboard with Multiple Agents (Recommended)
-
-One dashboard aggregating metrics from multiple devices.
-
-**Dashboard Host (Pi 1):**
-```env
-AGENT_URLS='["http://pi-2.local:9100/api/metrics","http://nas.local:9100/api/metrics"]'
-```
-
-**Agent Hosts:**
-- Pi 2: runs agent only
-- NAS: runs agent only
-- Any other device: add more URLs
-
----
-
-### Option 3: Scalable Multi-Device Setup
-
-Add new devices anytime by appending to the agent URL list.
-
-```env
-# Currently monitoring:
-AGENT_URLS='["http://pi-1.local:9100/api/metrics","http://pi-2.local:9100/api/metrics"]'
-
-# Add a third device:
-AGENT_URLS='["http://pi-1.local:9100/api/metrics","http://pi-2.local:9100/api/metrics","http://my-nas.local:9100/api/metrics"]'
-
-# Add a fourth device:
-AGENT_URLS='["http://pi-1.local:9100/api/metrics","http://pi-2.local:9100/api/metrics","http://my-nas.local:9100/api/metrics","http://server.local:9100/api/metrics"]'
-```
-
-No code changes needed—just restart the dashboard.
+Run the dashboard and agent on one device or deploy a central dashboard with
+agents on multiple devices. Register each agent by name and unique key as shown
+in [Adding/Removing Agents](#addingremoving-agents), then restart the dashboard.
+Each agent needs outbound access to the dashboard's WebSocket URL. A native
+agent on the dashboard host may use `ws://127.0.0.1:8888`; separate containers
+do not share loopback unless explicitly configured to share a network namespace.
 
 ---
 
@@ -802,10 +801,19 @@ No code changes needed—just restart the dashboard.
 
 ### Encrypted agent communication
 
-Every agent request is authenticated with the `X-Agent-Key` header (compared in
-constant time; the agent rejects missing, short or example keys). Without TLS
-the key and metrics travel in clear text, so enable HTTPS on agents outside
-`127.0.0.1`.
+Push agents authenticate with their configured name and unique `X-Agent-Key`.
+The agent verifies the dashboard's certificate and uses `wss://` for remote
+connections. Plain `ws://` is accepted only for loopback. A TLS-terminating
+proxy must support WebSocket upgrades; restrict access between the proxy and
+dashboard because that hop also carries the key and data.
+
+For private CAs, configure the agent's `NODESENTINEL_HUB_CA_CERT` with a
+readable public CA certificate. Compose users can enable the public CA mount
+in `compose.agent.yaml`; never mount the dashboard's private key on an agent.
+
+For **legacy HTTP-pull mode**, every request uses the `X-Agent-Key` header.
+Without TLS the key and metrics travel in clear text, so enable HTTPS on
+agents outside `127.0.0.1`:
 
 1. Create a certificate on the agent host (replace the name/IP with the address
    the dashboard uses):
@@ -817,11 +825,10 @@ the key and metrics travel in clear text, so enable HTTPS on agents outside
    chmod 600 agent.key
    ```
 
-2. Start the agent with TLS. Native: set `NODESENTINEL_AGENT_TLS_CERTFILE` and
-   `NODESENTINEL_AGENT_TLS_KEYFILE` in `/etc/nodesentinel-agent.env`. Docker
-   Compose: uncomment the TLS environment variables and certificate mount in
-   `compose.agent.yaml`, then set `NODESENTINEL_AGENT_TLS_DIR` to the directory
-   containing `agent.crt` and `agent.key`.
+2. Leave `NODESENTINEL_HUB_URL` unset and start the agent with
+   `NODESENTINEL_AGENT_TLS_CERTFILE` and `NODESENTINEL_AGENT_TLS_KEYFILE`
+   pointing to the agent certificate and private key. Legacy container
+   deployments also need a listener, port mapping and a protected TLS mount.
 3. Copy `agent.crt` (not the key) to the dashboard host and use an `https://`
    URL. With a config file, pin the certificate per agent:
 
@@ -841,20 +848,19 @@ the key and metrics travel in clear text, so enable HTTPS on agents outside
 
 ### Per-agent keys
 
-Prefer a different key per agent so a leaked key only affects one host. In the
-config file, add `"key"` to the agent entry; agents without it use `AGENT_KEY`.
-To register a new agent, generate its key, set it as `NODESENTINEL_AGENT_KEY` on the
-agent and as `"key"` in the dashboard config entry.
+Use a different key per agent so a leaked key only affects one host. Push
+agents require their own key in the JSON config; legacy pull agents without a
+per-agent key use `AGENT_KEY`. Set the push agent name and key in both the
+agent environment and dashboard config.
 
 ```json
 {
   "agents": {
     "HomeLab1": {
-      "url": "https://homelab1.lan:9100",
+      "mode": "push",
       "key": "unique-key-for-homelab1"
     }
-  },
-  "agent_key": "shared-fallback-key"
+  }
 }
 ```
 
@@ -862,14 +868,16 @@ agent and as `"key"` in the dashboard config entry.
 
 | Capability | Needed for | Default |
 | --- | --- | --- |
-| Read-only `/proc` and `/` mounts | CPU, RAM, storage | On |
-| Docker socket (root-equivalent) | Container status and events | On; remove the mount if not needed (Docker data is then shown as unavailable) |
-| `NODESENTINEL_JOURNAL_DIR` | SSH and Fail2Ban events | Off |
+| Read-only `/proc` mount | Host CPU, RAM and other kernel metrics | On |
+| Read-only `/` mount and `NODESENTINEL_ENABLE_HOST_ROOT=1` | Container agent host filesystem usage | Off |
+| Docker socket and `NODESENTINEL_ENABLE_DOCKER=1` | Container status and events | Off; socket access is root-equivalent |
+| Journal mount and `NODESENTINEL_ENABLE_JOURNAL=1` | SSH and Fail2Ban events | Off |
 | `NET_ADMIN`, host network and `/etc/ufw` in `compose.agent.yaml` | UFW status | Off |
 | `NODESENTINEL_ENABLE_FAIL2BAN=1` | Fail2Ban status | Off |
 
-All capabilities are dropped except those listed, the root filesystem is
-read-only and `no-new-privileges` is set. Enable only the sources you need.
+The container drops all capabilities by default, uses a read-only container
+filesystem and sets `no-new-privileges`. Native service hardening is provided
+in the systemd example. Enable only the sources you need.
 
 ### HTTPS for the dashboard behind a reverse proxy
 
@@ -894,6 +902,14 @@ server {
     server_name homelab.example.com;
     ssl_certificate     /etc/ssl/homelab.crt;
     ssl_certificate_key /etc/ssl/homelab.key;
+    location /api/agent/connect {
+        proxy_pass http://127.0.0.1:8888;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
     location / {
         proxy_pass http://127.0.0.1:8888;
         proxy_set_header Host $host;
@@ -906,7 +922,7 @@ server {
 Traefik: route to `http://127.0.0.1:8888` with a TLS router and the
 `X-Forwarded-Proto` header (set by default).
 
-**Example: Firewall rules to restrict agent access**
+**Example: Firewall rules for legacy pull-agent access**
 
 On each agent host:
 ```bash
@@ -929,18 +945,10 @@ sudo ufw deny 9100
    sudo systemctl status nodesentinel-agent.service
    ```
 
-2. Agent port is accessible:
-   ```bash
-   curl -H "X-Agent-Key: YOUR_AGENT_KEY" http://agent-hostname:9100/api/metrics
-   ```
-
-3. Hostnames resolve:
-   ```bash
-   ping pi-1.local
-   ping pi-2.local
-   ```
-
-4. Dashboard has correct URLs in `.env`
+2. Push agent logs show a successful connection. Verify the dashboard `wss://`
+   URL, certificate trust, WebSocket proxy support and outbound access.
+3. Agent name and key match its `mode: "push"` entry in the dashboard JSON.
+4. For legacy pull agents only, check the configured URL and agent port.
 
 ---
 
@@ -948,7 +956,7 @@ sudo ufw deny 9100
 
 If the browser says the server cannot be found, first check DNS with `nslookup YOUR-SUBDOMAIN` on the client. The name must resolve to the proxy host's reachable IP, not the dashboard port. For LAN-only use, configure the local DNS server to resolve the name to the proxy's LAN IP. Check DNS caches and that the client uses that DNS server.
 
-In Nginx Proxy Manager, forward using scheme `http`, the dashboard host's reachable IP and port `8888`, and select a trusted certificate for the subdomain. Verify port 443 is reachable and test `curl http://DASHBOARD-IP:8888/` from the proxy host. Within a container, `127.0.0.1` normally refers to the container, not the dashboard host.
+In Nginx Proxy Manager, forward using scheme `http`, the dashboard host's reachable IP and port `8888`, enable WebSocket support, and select a trusted certificate for the subdomain. Verify port 443 is reachable and test `curl http://DASHBOARD-IP:8888/` from the proxy host. Within a container, `127.0.0.1` normally refers to the container, not the dashboard host.
 
 For TLS terminated on another host, configure `NODESENTINEL_TRUSTED_PROXIES`
 with the actual trusted proxy source IP/CIDR so HTTPS cookies are marked
@@ -965,7 +973,8 @@ sudo -n ufw status
 sudo -n fail2ban-client status
 ```
 
-If these commands fail with permission errors, check sudoers configuration (see [Agent Setup → Step 3](#step-3-configure-sudo-optional-but-recommended)).
+Ensure the relevant enable flag and permissions are configured. The hardened
+systemd service prevents sudo elevation; see [optional security access](#step-3-configure-optional-security-access).
 
 ---
 
@@ -976,20 +985,16 @@ If these commands fail with permission errors, check sudoers configuration (see 
 docker ps -a
 ```
 
-If Docker is not installed, the agent simply skips container monitoring (no error).
+Enable `NODESENTINEL_ENABLE_DOCKER=1` and grant Docker access only if its
+root-equivalent privileges are acceptable. Missing access is shown as unavailable.
 
 ---
 
-### Agent won't start with "no new privileges" error
+### Privileged optional sources unavailable under systemd
 
-Remove `NoNewPrivileges=true` from the systemd service file:
-
-```bash
-sudo nano /etc/systemd/system/nodesentinel-agent.service
-# Delete or comment out: NoNewPrivileges=true
-sudo systemctl daemon-reload
-sudo systemctl restart nodesentinel-agent.service
-```
+The hardened service blocks sudo privilege elevation. Prefer a narrowly
+restricted helper, or deliberately change the service restrictions after
+assessing the increased risk. Do not remove protections just to hide errors.
 
 ---
 

@@ -53,6 +53,11 @@ func runAgent() error {
 	if err != nil {
 		return err
 	}
+	if env("HUB_URL", "") != "" {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		return service.push(ctx)
+	}
 	address := env("AGENT_BIND_ADDRESS", "0.0.0.0")
 	port := env("AGENT_PORT", "9100")
 	server := &http.Server{

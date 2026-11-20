@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -417,13 +418,13 @@ func (d *dashboard) notificationLoop(ctx context.Context) {
 			log.Printf("Cannot read notification settings: %v", err)
 		} else {
 			enabled := enabledProviders(settings)
-			d.mu.Lock()
-			for provider := range d.notificationCursors {
+			for _, provider := range providers {
 				if _, exists := enabled[provider]; !exists {
-					delete(d.notificationCursors, provider)
+					if _, err := d.store.monitorDB.Exec(`DELETE FROM notification_cursors WHERE provider=?`, provider); err != nil {
+						log.Printf("Cannot clear notification cursors for %s: %v", provider, err)
+					}
 				}
 			}
-			d.mu.Unlock()
 			now := time.Now().Unix()
 			for provider, providerSettings := range enabled {
 				d.pollProviderEvents(ctx, provider, providerSettings, now)
@@ -448,30 +449,36 @@ func (d *dashboard) pollProviderEvents(ctx context.Context, provider string, set
 	}
 	for name, item := range d.agents {
 		for _, kind := range []string{"ssh_login", "ssh_logout", "fail2ban", "docker"} {
-			key := name + "\x00" + kind
 			if !enabledEvents[kind] {
-				d.mu.Lock()
-				delete(d.notificationCursors[provider], key)
-				d.mu.Unlock()
+				if _, err := d.store.monitorDB.Exec(`DELETE FROM notification_cursors WHERE host=? AND provider=? AND kind=?`,
+					name, provider, kind); err != nil {
+					log.Printf("Cannot clear notification cursor for %s (%s, %s): %v", name, kind, provider, err)
+				}
 				continue
 			}
-			d.mu.Lock()
-			if d.notificationCursors[provider] == nil {
-				d.notificationCursors[provider] = map[string]int64{}
-			}
-			since, exists := d.notificationCursors[provider][key]
-			if !exists {
-				d.notificationCursors[provider][key] = now
-				d.mu.Unlock()
+			var since int64
+			err := d.store.monitorDB.QueryRow(`SELECT until_time FROM notification_cursors WHERE host=? AND provider=? AND kind=?`,
+				name, provider, kind).Scan(&since)
+			if errors.Is(err, sql.ErrNoRows) {
+				if _, err := d.store.monitorDB.Exec(`INSERT INTO notification_cursors VALUES (?, ?, ?, ?)`,
+					name, provider, kind, now); err != nil {
+					log.Printf("Cannot initialize notification cursor for %s (%s, %s): %v", name, kind, provider, err)
+				}
 				continue
 			}
-			d.mu.Unlock()
+			if err != nil {
+				log.Printf("Cannot read notification cursor for %s (%s, %s): %v", name, kind, provider, err)
+				continue
+			}
+			if enabledAt := int64(numberValue(settings["enabled_at"])); since < enabledAt {
+				since = enabledAt
+			}
 			if since >= now {
 				continue
 			}
 			query := url.Values{"since": {strconv.FormatInt(since, 10)}, "until": {strconv.FormatInt(now, 10)}, "types": {kind}}
 			ctxRequest, cancel := context.WithTimeout(ctx, 20*time.Second)
-			response, err := d.agentRequestWithQuery(ctxRequest, item, "/api/events", query)
+			response, err := d.agentRequestWithQuery(ctxRequest, name, item, "/api/events", query)
 			if err == nil {
 				var payload struct {
 					Events []map[string]any `json:"events"`
@@ -499,14 +506,21 @@ func (d *dashboard) pollProviderEvents(ctx context.Context, provider string, set
 				log.Printf("Notification polling failed for %s (%s, %s): %s", name, kind, provider, notificationError(err))
 				continue
 			}
-			d.mu.Lock()
-			d.notificationCursors[provider][key] = now
-			d.mu.Unlock()
+			if _, err := d.store.monitorDB.Exec(`UPDATE notification_cursors SET until_time=? WHERE host=? AND provider=? AND kind=?`,
+				now, name, provider, kind); err != nil {
+				log.Printf("Cannot save notification cursor for %s (%s, %s): %v", name, kind, provider, err)
+			}
 		}
 	}
 }
 
-func (d *dashboard) agentRequestWithQuery(ctx context.Context, item agentConfig, path string, query url.Values) (*http.Response, error) {
+func (d *dashboard) agentRequestWithQuery(ctx context.Context, name string, item agentConfig, path string, query url.Values) (*http.Response, error) {
+	if item.Mode == "push" {
+		if path != "/api/events" {
+			return nil, errors.New("unsupported push agent request")
+		}
+		return d.requestPushEvents(ctx, name, query)
+	}
 	target, err := url.Parse(strings.TrimRight(item.URL, "/") + path)
 	if err != nil {
 		return nil, err

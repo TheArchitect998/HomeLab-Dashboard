@@ -117,14 +117,25 @@ func (a *agent) metrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *agent) collectMetrics(ctx context.Context) (map[string]any, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	root := "/"
 	procPath := "/"
 	if a.containerMode {
 		root, procPath = "/host/root", "/host/proc"
 	}
-	usage, err := disk.Usage(root)
-	if err != nil {
-		return nil, fmt.Errorf("disk usage: %w", err)
+	var storagePercent, storageFree any
+	storageError := ""
+	if a.containerMode && env("ENABLE_HOST_ROOT", "") != "1" {
+		storageError = "Host filesystem access is not enabled for this agent."
+	} else if usage, err := disk.Usage(root); err != nil {
+		storageError = "Host filesystem usage is unavailable: " + err.Error()
+	} else if usage.Total == 0 {
+		storageError = "Host filesystem usage is unavailable."
+	} else {
+		storagePercent = math.Round(usage.UsedPercent*10) / 10
+		storageFree = usage.Free
 	}
 	vm, _ := mem.VirtualMemory()
 	swap, _ := mem.SwapMemory()
@@ -132,11 +143,18 @@ func (a *agent) collectMetrics(ctx context.Context) (map[string]any, error) {
 	info, _ := host.Info()
 	uptime, _ := host.Uptime()
 	temp := a.temperature()
-	containers, dockerError := a.docker()
+	containers := []map[string]any{}
+	dockerError := errors.New("Docker access is not enabled for this agent.")
+	if env("ENABLE_DOCKER", "") == "1" {
+		containers, dockerError = a.docker(ctx)
+	}
 	rates := a.ioRates()
 	dockerStats := any(unavailable("Docker is not available"))
+	if dockerError != nil {
+		dockerStats = unavailable(dockerError.Error())
+	}
 	if dockerError == nil || len(containers) != 0 {
-		dockerStats = a.cached("docker_stats", 30*time.Second, a.containerStats)
+		dockerStats = a.cached(ctx, "docker_stats", 30*time.Second, func() any { return a.containerStats(ctx) })
 	}
 	var ramPercent float64
 	if vm != nil {
@@ -146,15 +164,11 @@ func (a *agent) collectMetrics(ctx context.Context) (map[string]any, error) {
 	if len(cpuPercent) > 0 {
 		cpuValue = cpuPercent[0]
 	}
-	storagePercent := 0.0
-	if usage.Total > 0 {
-		storagePercent = math.Round(usage.UsedPercent*10) / 10
-	}
 	platform := ""
 	if info != nil {
 		platform = strings.TrimSpace(strings.Join([]string{info.Platform, info.PlatformVersion, info.KernelVersion}, " "))
 	}
-	return map[string]any{
+	data := map[string]any{
 		"host":               hostName(),
 		"platform":           platform,
 		"timestamp":          time.Now().UTC().Format(time.RFC3339Nano),
@@ -162,21 +176,26 @@ func (a *agent) collectMetrics(ctx context.Context) (map[string]any, error) {
 		"cpu_percent":        cpuValue,
 		"ram_percent":        ramPercent,
 		"storage_percent":    storagePercent,
-		"storage_free_bytes": usage.Free,
+		"storage_free_bytes": storageFree,
+		"storage_error":      storageError,
 		"uptime_seconds":     uptimeFor(procPath, uptime),
-		"ufw":                a.firewall(),
-		"fail2ban":           a.fail2ban(),
+		"ufw":                a.firewall(ctx),
+		"fail2ban":           a.fail2ban(ctx),
 		"docker":             containers,
 		"docker_error":       errorString(dockerError),
 		"docker_stats":       dockerStats,
 		"swap_percent":       nullableFloat(swap),
 		"disk_io":            rates["disk_io"],
 		"network":            rates["network"],
-		"smart":              a.cached("smart", 10*time.Minute, a.smart),
-		"gpu":                a.cached("gpu", 30*time.Second, a.gpu),
-		"zfs":                a.cached("zfs", 30*time.Second, a.zfs),
+		"smart":              a.cached(ctx, "smart", 10*time.Minute, func() any { return a.smart(ctx) }),
+		"gpu":                a.cached(ctx, "gpu", 30*time.Second, func() any { return a.gpu(ctx) }),
+		"zfs":                a.cached(ctx, "zfs", 30*time.Second, func() any { return a.zfs(ctx) }),
 		"battery":            a.battery(),
-	}, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func nullableFloat(value *mem.SwapMemoryStat) any {
@@ -251,7 +270,7 @@ func (a *agent) battery() map[string]any {
 	return unavailable("No battery found.")
 }
 
-func (a *agent) cached(key string, ttl time.Duration, producer func() any) any {
+func (a *agent) cached(ctx context.Context, key string, ttl time.Duration, producer func() any) any {
 	a.mu.Lock()
 	if cached, ok := a.cache[key]; ok && time.Since(cached.at) < ttl {
 		a.mu.Unlock()
@@ -259,6 +278,9 @@ func (a *agent) cached(key string, ttl time.Duration, producer func() any) any {
 	}
 	a.mu.Unlock()
 	value := safely(producer)
+	if ctx.Err() != nil {
+		return value
+	}
 	a.mu.Lock()
 	a.cache[key] = cachedValue{at: time.Now(), value: value}
 	a.mu.Unlock()
@@ -336,11 +358,11 @@ func (a *agent) run(ctx context.Context, timeout time.Duration, name string, arg
 	return commandResult{Code: code, Text: strings.TrimSpace(string(out))}
 }
 
-func (a *agent) firewall() map[string]any {
-	if a.containerMode && env("ENABLE_UFW", "") != "1" {
+func (a *agent) firewall(ctx context.Context) map[string]any {
+	if env("ENABLE_UFW", "") != "1" {
 		return map[string]any{"active": nil, "raw": "UFW access is not enabled for this agent."}
 	}
-	result := a.run(context.Background(), 5*time.Second, "ufw", "status")
+	result := a.run(ctx, 5*time.Second, "ufw", "status")
 	re := regexp.MustCompile(`(?i)status:\s*(active|inactive)\b`)
 	match := re.FindStringSubmatch(result.Text)
 	if result.Code != 0 || len(match) == 0 {
@@ -353,12 +375,12 @@ func (a *agent) firewall() map[string]any {
 	return map[string]any{"active": strings.EqualFold(match[1], "active"), "raw": result.Text}
 }
 
-func (a *agent) fail2ban() map[string]any {
-	if a.containerMode && env("ENABLE_FAIL2BAN", "") != "1" {
+func (a *agent) fail2ban(ctx context.Context) map[string]any {
+	if env("ENABLE_FAIL2BAN", "") != "1" {
 		return map[string]any{"active": nil, "jails": []string{}, "details": map[string]string{},
 			"raw": "Fail2Ban access is not enabled for this agent."}
 	}
-	result := a.run(context.Background(), 5*time.Second, "fail2ban-client", "status")
+	result := a.run(ctx, 5*time.Second, "fail2ban-client", "status")
 	if result.Code != 0 || !strings.Contains(strings.ToLower(result.Text), "jail list:") {
 		text := result.Text
 		if text == "" {
@@ -379,15 +401,15 @@ func (a *agent) fail2ban() map[string]any {
 				continue
 			}
 			jails = append(jails, jail)
-			info := a.run(context.Background(), 5*time.Second, "fail2ban-client", "status", jail)
+			info := a.run(ctx, 5*time.Second, "fail2ban-client", "status", jail)
 			details[jail] = info.Text
 		}
 	}
 	return map[string]any{"active": true, "jails": jails, "details": details, "raw": result.Text}
 }
 
-func (a *agent) docker() ([]map[string]any, error) {
-	result := a.run(context.Background(), 5*time.Second, "docker", "ps", "-a", "--format", "{{json .}}")
+func (a *agent) docker(ctx context.Context) ([]map[string]any, error) {
+	result := a.run(ctx, 5*time.Second, "docker", "ps", "-a", "--format", "{{json .}}")
 	if result.Code != 0 {
 		return []map[string]any{}, errors.New(orDefault(result.Text, "Docker status could not be determined."))
 	}
@@ -405,7 +427,7 @@ func (a *agent) docker() ([]map[string]any, error) {
 			failures = append(failures, fmt.Sprintf("Invalid Docker container name: %q", name))
 			continue
 		}
-		inspect := a.run(context.Background(), 5*time.Second, "docker", "inspect", "--format", "{{json .State}}", "--", name)
+		inspect := a.run(ctx, 5*time.Second, "docker", "inspect", "--format", "{{json .State}}", "--", name)
 		if inspect.Code != 0 {
 			failures = append(failures, name+": "+orDefault(inspect.Text, "Docker inspect failed"))
 		}
@@ -489,8 +511,8 @@ func (a *agent) ioRates() map[string]any {
 	return rates
 }
 
-func (a *agent) containerStats() any {
-	raw := a.run(context.Background(), 6*time.Second, "docker", "stats", "--no-stream", "--format", "{{json .}}")
+func (a *agent) containerStats(ctx context.Context) any {
+	raw := a.run(ctx, 6*time.Second, "docker", "stats", "--no-stream", "--format", "{{json .}}")
 	if raw.Code != 0 {
 		return unavailable(orDefault(raw.Text, "Docker statistics could not be determined."))
 	}
@@ -577,7 +599,7 @@ func splitSlash(value string) (string, string) {
 	return strings.TrimSpace(left), strings.TrimSpace(right)
 }
 
-func (a *agent) smart() any {
+func (a *agent) smart(ctx context.Context) any {
 	if env("ENABLE_SMART", "") != "1" {
 		return unavailable("S.M.A.R.T. access is not enabled for this agent.")
 	}
@@ -585,7 +607,7 @@ func (a *agent) smart() any {
 		return unavailable("smartctl is not installed in this agent image.")
 	}
 	args := []string{"--scan", "-j"}
-	scan := a.run(context.Background(), 15*time.Second, "smartctl", args...)
+	scan := a.run(ctx, 15*time.Second, "smartctl", args...)
 	var result map[string]any
 	if json.Unmarshal([]byte(scan.Text), &result) != nil {
 		return unavailable(truncate(orDefault(scan.Text, "smartctl scan failed"), 200))
@@ -610,7 +632,7 @@ func (a *agent) smart() any {
 			cmdArgs = append(cmdArgs, "-d", kind)
 		}
 		cmdArgs = append(cmdArgs, name)
-		raw := a.run(context.Background(), 15*time.Second, "smartctl", cmdArgs...)
+		raw := a.run(ctx, 15*time.Second, "smartctl", cmdArgs...)
 		var info map[string]any
 		if json.Unmarshal([]byte(raw.Text), &info) != nil {
 			disks = append(disks, map[string]any{"device": name, "available": false,
@@ -672,11 +694,11 @@ func (a *agent) smart() any {
 	return map[string]any{"available": true, "disks": disks}
 }
 
-func (a *agent) gpu() any {
+func (a *agent) gpu(ctx context.Context) any {
 	if _, err := exec.LookPath("nvidia-smi"); err != nil {
 		return unavailable("No NVIDIA GPU tools found.")
 	}
-	result := a.run(context.Background(), 5*time.Second, "nvidia-smi",
+	result := a.run(ctx, 5*time.Second, "nvidia-smi",
 		"--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu",
 		"--format=csv,noheader,nounits")
 	if result.Code != 0 {
@@ -702,11 +724,11 @@ func (a *agent) gpu() any {
 	return map[string]any{"available": true, "gpus": gpus}
 }
 
-func (a *agent) zfs() any {
+func (a *agent) zfs(ctx context.Context) any {
 	if _, err := exec.LookPath("zpool"); err != nil {
 		return unavailable("ZFS tools not found.")
 	}
-	result := a.run(context.Background(), 5*time.Second, "zpool", "list", "-H", "-p", "-o", "name,health,size,allocated")
+	result := a.run(ctx, 5*time.Second, "zpool", "list", "-H", "-p", "-o", "name,health,size,allocated")
 	if result.Code != 0 {
 		return unavailable(truncate(orDefault(result.Text, "zpool failed"), 200))
 	}
@@ -746,28 +768,39 @@ func (a *agent) events(w http.ResponseWriter, r *http.Request) {
 	if !a.authenticate(w, r) {
 		return
 	}
-	query := r.URL.Query()
-	since, errSince := strconv.ParseInt(query.Get("since"), 10, 64)
-	until, errUntil := strconv.ParseInt(query.Get("until"), 10, 64)
-	types := query["types"]
-	allowed := map[string]bool{"ssh_login": true, "ssh_logout": true, "fail2ban": true, "docker": true}
-	if errSince != nil || errUntil != nil || since < 0 || until <= since {
-		writeError(w, http.StatusBadRequest, "Invalid event query")
+	since, until, types, details, err := parseEventQuery(r.URL.Query())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	for _, kind := range types {
-		if !allowed[kind] {
-			writeError(w, http.StatusBadRequest, "Invalid event query")
-			return
-		}
-	}
-	details := query.Get("details") != "false"
 	found, err := a.collectEvents(r.Context(), since, until, types, details)
 	if err != nil {
 		writeError(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"events": found})
+}
+
+func parseEventQuery(query map[string][]string) (int64, int64, []string, bool, error) {
+	first := func(key string) string {
+		if len(query[key]) == 0 {
+			return ""
+		}
+		return query[key][0]
+	}
+	since, errSince := strconv.ParseInt(first("since"), 10, 64)
+	until, errUntil := strconv.ParseInt(first("until"), 10, 64)
+	types := query["types"]
+	allowed := map[string]bool{"ssh_login": true, "ssh_logout": true, "fail2ban": true, "docker": true}
+	if errSince != nil || errUntil != nil || since < 0 || until <= since {
+		return 0, 0, nil, false, errors.New("Invalid event query")
+	}
+	for _, kind := range types {
+		if !allowed[kind] {
+			return 0, 0, nil, false, errors.New("Invalid event query")
+		}
+	}
+	return since, until, types, first("details") != "false", nil
 }
 
 func (a *agent) collectEvents(ctx context.Context, since, until int64, types []string, details bool) ([]map[string]any, error) {
@@ -777,6 +810,9 @@ func (a *agent) collectEvents(ctx context.Context, since, until int64, types []s
 	}
 	events := []map[string]any{}
 	if want["ssh_login"] || want["ssh_logout"] || want["fail2ban"] {
+		if env("ENABLE_JOURNAL", "") != "1" {
+			return nil, errors.New("Journal access is not enabled for this agent")
+		}
 		args := append(a.journalArgs(), "--no-pager", "-o", "json", "--since", fmt.Sprintf("@%d", since), "--until", fmt.Sprintf("@%d", until))
 		result := a.run(ctx, 15*time.Second, args[0], args[1:]...)
 		if result.Code != 0 {
@@ -826,6 +862,9 @@ func (a *agent) collectEvents(ctx context.Context, since, until int64, types []s
 		}
 	}
 	if want["docker"] {
+		if env("ENABLE_DOCKER", "") != "1" {
+			return nil, errors.New("Docker access is not enabled for this agent")
+		}
 		result := a.run(ctx, 15*time.Second, "docker", "events", "--since", strconv.FormatInt(since, 10),
 			"--until", strconv.FormatInt(until, 10), "--filter", "type=container", "--format", "{{json .}}")
 		if result.Code != 0 {

@@ -240,7 +240,7 @@ func (d *dashboard) collectReportEvents(ctx context.Context, now int64, reportSt
 			}
 			query := url.Values{"since": {strconv.FormatInt(until, 10)}, "until": {strconv.FormatInt(now, 10)},
 				"types": {kind}, "details": {"false"}}
-			response, err := d.agentRequestWithQuery(ctx, item, "/api/events", query)
+			response, err := d.agentRequestWithQuery(ctx, name, item, "/api/events", query)
 			if err != nil {
 				log.Printf("Report collection failed for %s (%s): %s", name, kind, notificationError(err))
 				continue
@@ -302,7 +302,7 @@ func (d *dashboard) collectTemperatures(ctx context.Context, monitoring map[stri
 		err := d.store.monitorDB.QueryRow(`SELECT time, temperature FROM samples WHERE host=? ORDER BY time DESC LIMIT 1`, name).
 			Scan(&sampleTime, &temperature)
 		if errors.Is(err, sql.ErrNoRows) || (err == nil && now.Sub(time.Unix(int64(sampleTime), 0)) >= 5*time.Minute) {
-			data, fetchErr := d.fetchMetrics(ctx, item)
+			data, fetchErr := d.fetchMetrics(ctx, name, item)
 			if fetchErr != nil {
 				log.Printf("Temperature monitoring failed for %s: %s", name, notificationError(fetchErr))
 				continue
@@ -374,7 +374,7 @@ func (d *dashboard) collectHardwareAlerts(ctx context.Context, monitoring map[st
 			continue
 		}
 		d.mu.Unlock()
-		data, err := d.fetchMetrics(ctx, item)
+		data, err := d.fetchMetrics(ctx, name, item)
 		if err != nil {
 			log.Printf("Hardware monitoring failed for %s: %s", name, notificationError(err))
 			continue
@@ -544,7 +544,10 @@ func (d *dashboard) sendDailyReports(ctx context.Context, activeProviders map[st
 	return nil
 }
 
-func (d *dashboard) fetchMetrics(ctx context.Context, item agentConfig) (map[string]any, error) {
+func (d *dashboard) fetchMetrics(ctx context.Context, name string, item agentConfig) (map[string]any, error) {
+	if item.Mode == "push" {
+		return d.pushedMetrics(name)
+	}
 	response, err := d.agentRequest(ctx, item, "/api/metrics")
 	if err != nil {
 		return nil, err
