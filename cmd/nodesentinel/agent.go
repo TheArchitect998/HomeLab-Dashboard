@@ -872,35 +872,54 @@ func (a *agent) collectEvents(ctx context.Context, since, until int64, types []s
 		}
 		scanner := bufio.NewScanner(strings.NewReader(result.Text))
 		for scanner.Scan() {
-			var row map[string]any
-			if json.Unmarshal(scanner.Bytes(), &row) != nil {
-				return nil, errors.New("Invalid Docker event")
-			}
-			nanos, err := strconv.ParseInt(fmt.Sprint(row["timeNano"]), 10, 64)
-			action, _ := row["Action"].(string)
-			actor, _ := row["Actor"].(map[string]any)
-			attributes, _ := actor["Attributes"].(map[string]any)
-			id, _ := row["id"].(string)
-			name := fmt.Sprint(attributes["name"])
-			if name == "<nil>" || name == "" {
-				if len(id) > 12 {
-					id = id[:12]
-				}
-				name = id
-			}
+			event, relevant, err := parseDockerEvent(scanner.Bytes(), since, until)
 			if err != nil {
-				return nil, errors.New("Invalid Docker event")
+				return nil, err
 			}
-			ts := float64(nanos) / 1e9
-			if ts < float64(since) || ts >= float64(until) || (action != "start" && action != "die") {
+			if !relevant {
 				continue
 			}
-			events = append(events, map[string]any{"type": "docker", "message": "Docker " + action + ": " + name,
-				"timestamp": ts, "action": action, "name": name, "image": attributes["image"], "exit_code": attributes["exitCode"]})
+			events = append(events, event)
+		}
+		if err := scanner.Err(); err != nil {
+			return nil, err
 		}
 	}
 	sort.Slice(events, func(i, j int) bool { return events[i]["timestamp"].(float64) < events[j]["timestamp"].(float64) })
 	return events, nil
+}
+
+func parseDockerEvent(data []byte, since, until int64) (map[string]any, bool, error) {
+	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder.UseNumber()
+	var row map[string]any
+	if err := decoder.Decode(&row); err != nil {
+		return nil, false, errors.New("Invalid Docker event")
+	}
+	nanos, err := strconv.ParseInt(fmt.Sprint(row["timeNano"]), 10, 64)
+	if err != nil {
+		return nil, false, errors.New("Invalid Docker event timestamp")
+	}
+	action, _ := row["Action"].(string)
+	actor, _ := row["Actor"].(map[string]any)
+	attributes, _ := actor["Attributes"].(map[string]any)
+	id, _ := row["id"].(string)
+	name := fmt.Sprint(attributes["name"])
+	if name == "<nil>" || name == "" {
+		if len(id) > 12 {
+			id = id[:12]
+		}
+		name = id
+	}
+	ts := float64(nanos) / 1e9
+	if ts < float64(since) || ts >= float64(until) || (action != "start" && action != "die") {
+		return nil, false, nil
+	}
+	return map[string]any{
+		"type": "docker", "message": "Docker " + action + ": " + name,
+		"timestamp": ts, "action": action, "name": name,
+		"image": attributes["image"], "exit_code": attributes["exitCode"],
+	}, true, nil
 }
 
 func (a *agent) journalArgs() []string {

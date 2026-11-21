@@ -274,3 +274,22 @@ func TestNotificationCursorSurvivesDisconnectAndRestart(t *testing.T) {
 		t.Fatalf("saved cursor = %d, want 120", saved)
 	}
 }
+
+func TestParseDockerEventPreservesNanosecondTimestamp(t *testing.T) {
+	line := []byte(`{"id":"1234567890abcdef","Action":"die","Actor":{"Attributes":{"name":"web","image":"example/web:latest","exitCode":"137"}},"timeNano":1763721234567890123}`)
+	event, relevant, err := parseDockerEvent(line, 1763721234, 1763721235)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !relevant {
+		t.Fatal("valid Docker die event was ignored")
+	}
+	if event["action"] != "die" || event["name"] != "web" || event["image"] != "example/web:latest" ||
+		event["exit_code"] != "137" {
+		t.Fatalf("parsed Docker event = %#v", event)
+	}
+	timestamp := event["timestamp"].(float64)
+	if timestamp < 1763721234.567 || timestamp > 1763721234.568 {
+		t.Fatalf("timestamp = %.12f, want retained nanosecond value", timestamp)
+	}
+}
