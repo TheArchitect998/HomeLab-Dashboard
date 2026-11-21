@@ -15,6 +15,7 @@ and a daily report with a configurable time help you monitor your homelab.
 - [Features](#features)
 - [Architecture](#architecture)
 - [Requirements](#requirements)
+- [Choosing an installation method](#choosing-an-installation-method)
 - [Quick Start](#quick-start)
 - [Docker Compose](#docker-compose)
 - [Installation](#installation)
@@ -96,6 +97,19 @@ Choose one deployment method:
 
 Python is not required for either deployment. UFW, Fail2Ban and Docker on
 monitored hosts are optional agent integrations.
+
+---
+
+## Choosing an installation method
+
+| Method | Best for | What you need | Start here |
+| --- | --- | --- | --- |
+| Docker Compose | Users who prefer prebuilt images and container-based deployment | Docker Engine and the Compose plugin | [Docker Compose](#docker-compose) |
+| Dockhand or Portainer stack | Users who manage Docker deployments through a web interface | Docker and a Dockhand or Portainer installation | [Stack guide](#deploy-as-a-dockhand-or-portainer-stack) |
+| Native Linux | Users who prefer a host executable and systemd services | Linux and Go 1.24+ to build the executable | [Quick Start](#quick-start), then [native installation](#installation) |
+
+The Quick Start and the later Installation section describe the native setup.
+Systemd and sudoers instructions there do not apply to a Compose deployment.
 
 ---
 
